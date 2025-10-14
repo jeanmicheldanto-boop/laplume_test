@@ -13,20 +13,27 @@ org_regex:
     - "\\bSIAO\\b"
 
   ORG_DEPARTEMENT:
-    - "\\bDépartement\\s+(du|de la|des|de)\\b"
-    - "\\bConseil\\s+départemental\\b"
+    - "\\bConseil\\s+[Dd]épartemental\\b"
+    - "\\bConseil\\s+Départemental\\b"
+    - "\\bDépartement\\s+(?:du|de\\s+la|des|de)\\b"
 
   ORG_REGION:
-    - "\\bRégion\\b"
     - "\\bConseil\\s+régional\\b"
+    - "\\bRégion\\b"
 
   ORG_PREFECTURE:
     - "\\bPréfecture\\b"
     - "\\bSous[-\\s]?préfecture\\b"
 
+  # Justice (évite que "TJ Bobigny" parte en LOC)
+  ORG_JUSTICE:
+    - "\\bTJ\\s+[A-ZÉ][\\w''\\-]+\\b"
+    - "\\bTGI\\s+[A-ZÉ][\\w''\\-]+\\b"
+    - "\\bTribunal\\s+(?:Judiciaire|de\\s+Grande\\s+Instance)\\b"
+
   ORG_DDETS:
-    - "\\bDDETS(PP)?\\b"
-    - "\\bDirection\\s+d[’'](l’)?emploi\\b"
+    - "\\bDDETS(?:PP)?\\b"
+    - "\\bDirection\\s+d[’'](?:l’)?emploi\\b"
 
   ORG_ARS:
     - "\\bARS\\b"
@@ -82,6 +89,11 @@ org_regex:
     - "\\bCHU\\b"
     - "\\bCentre\\s+Hospitalier\\b"
     - "\\bCHR\\b"
+    # variantes explicites "CHU/Centre hospitalier <Ville>"
+    - "\\bCHU\\s+(?:de\\s+)?[A-ZÉÈÀÂÎÙÔÇ][\\w’'\\-]+(?:\\s+[A-ZÉÈÀÂÎÙÔÇ][\\w’'\\-]+){0,2}\\b"
+    - "\\b(?:Centre\\s+Hospitalier|CHR)\\s+(?:de\\s+)?[A-ZÉÈÀÂÎÙÔÇ][\\w’'\\-]+(?:\\s+[A-ZÉÈÀÂÎÙÔÇ][\\w’'\\-]+){0,2}\\b"
+    # hôpitaux nominatifs (ex: Hôpital Cochin, La Timone…)
+    - "\\bHôpit(?:al|aux)\\s+[A-ZÉÈÀÂÎÙÔÇ][\\w’'\\-]+(?:\\s+[A-ZÉÈÀÂÎÙÔÇ][\\w’'\\-]+){0,3}\\b"
 
   ORG_EPSM:
     - "\\bEPSM\\b"
@@ -111,7 +123,7 @@ org_regex:
     - "\\bPASS\\b"
     - "\\bPermanence\\s+d’Accès\\s+aux\\s+Soins\\s+de\\s+Santé\\b"
 
-  ORG_MDA:   # Maison des Adolescents
+  ORG_MDA:
     - "\\bMDA\\b"
     - "\\bMaison\\s+des\\s+Adolescents\\b"
 
@@ -139,28 +151,43 @@ org_regex:
     - "\\bCAO\\b"
     - "\\bCentre\\s+d[’']Accueil\\s+et\\s+d[’']Orientation\\b"
 
+  # --- Insertion socio-pro locale ---
+  ORG_MISSION_LOCALE:
+    - "\\bMission\\s+Locale\\b"
+    - "\\bMission\\s+Locale\\s+(?:de|du|d’|d')\\s+[A-ZÉÈÀÂÎÙÔÇ][\\w’'\\- ]+\\b"
+    - "\\bMaison\\s+de\\s+l[’']Emploi\\b"
+
+  # --- Services d'aide à domicile (organismes) ---
+  ORG_SAD:
+    - "\\bADMR\\b"
+    - "\\bService\\s+d['’]Aide\\s+à\\s+Domicile\\b"
+    - "\\bService\\s+d['’]Aide\\s+et\\s+d['’]Accompagnement\\s+à\\s+Domicile\\b"
+    - "\\bAide\\s+à\\s+Domicile\\b"
+    - "\\bServices?\\s+à\\s+la\\s+personne\\b"
+
   # --- Bailleurs sociaux / logement ---
   ORG_BAILLEUR_SOC:
-    - "\\bOPH(\\s+de\\s+[A-ZÉ][A-Za-zÀ-ÖØ-öø-ÿ'’\\- ]+)?\\b"
+    - "\\bOPH(?:\\s+de\\s+[A-ZÉ][A-Za-zÀ-ÖØ-öø-ÿ’'\\- ]+)?\\b"
     - "\\bOPAC\\b"
     - "\\bOPHLM\\b"
-    - "\\b(Office|Offices?)\\s+Public(s)?\\s+(?:d’|d')?Habitat\\b"
+    - "\\b(?:Office|Offices?)\\s+Public(?:s)?\\s+d['’]Habitat\\b"
     - "\\bESH\\b"
     - "\\bS(?:A|A\\.?)\\s*HLM\\b"
-    - "\\bHabitat\\s+\\d{2}\\b"
-    - "\\b(Habitat|HLM)\\b"
     - "\\bCDC\\s+Habitat\\b"
+    - "\\bHabitat\\s+\\d{2}\\b"
+    - "\\bHabitat\\s+[A-ZÉ][A-Za-zÀ-ÖØ-öø-ÿ’'\\- ]+\\b"
+    - "\\bHLM\\b"
 
-  # --- Financiers (resserrés) ---
+  # --- Entreprises (utile pour employeurs) ---
+  ORG_ENTREPRISE_PRIV:
+    - "\\bCarrefour\\b|\\bAuchan\\b|\\bLeclerc\\b|\\bCasino\\b|\\bMonoprix\\b|\\bFranprix\\b|\\bIntermarché\\b"
+
   ORG_FINANCIER:
-    - "\\bBanque\\s+(Populaire|Postale|Palatine|Tarneaud|Courtois|\\w+)\\b"
-    - "\\bCrédit\\s+(Mutuel|Agricole|Coopératif)\\b"
+    - "\\bBanque\\s+(?:Populaire|Postale|Palatine|Tarneaud|Courtois|\\w+)\\b"
+    - "\\bCrédit\\s+(?:Mutuel|Agricole|Coopératif)\\b"
     - "\\bSociété\\s+Générale\\b"
     - "\\bBNP\\s+Paribas\\b"
-    - "\\bCofidis\\b"
-    - "\\bCetelem\\b"
-    - "\\bOney\\b"
-    - "\\bFloabank\\b"
+    - "\\bCofidis\\b|\\bCetelem\\b|\\bOney\\b|\\bFloabank\\b"
 
   # --- Grandes associations / fondations nationales ---
   ORG_CROIX_ROUGE:
@@ -186,9 +213,7 @@ org_regex:
     - "\\bAPF\\s+France\\s+handicap\\b"
 
   ORG_UNAPEI:
-    - "\\bUNAPEI\\b"
-    - "\\bADAPEI\\b"
-    - "\\bAPEI\\b"
+    - "\\bUNAPEI\\b|\\bADAPEI\\b|\\bAPEI\\b"
 
   ORG_ASEI:
     - "\\bASEI\\b"
@@ -200,8 +225,9 @@ org_regex:
   ORG_AFM_TELETHON:
     - "\\bAFM\\s+Téléthon\\b"
 
+  # Sauvegarde (départementalisée) — ex: "Sauvegarde 44", "Sauvegarde de l'Enfance ..."
   ORG_SAUVEGARDE:
-    - "\\bSauvegarde\\s+(\\d{2}|[A-ZÉ][A-Za-zÀ-ÖØ-öø-ÿ'’\\- ]+)\\b"
+    - "\\bSauvegarde\\s+(?:\\d{2}|de\\s+l[’']Enfance|de\\s+[A-ZÉ][A-Za-zÀ-ÖØ-öø-ÿ’'\\- ]+)\\b"
 
   # --- Associations / fondations génériques (locales) ---
   ORG_ASSOC_GENERIC:
@@ -211,11 +237,16 @@ org_regex:
     - "\\bInsertion\\b"
     - "\\bRelais\\s+Insertion\\s+\\d{2}\\b"
     - "\\bMosaïque\\s+Service\\s+Social\\b"
+    # Cas SOS Villages d'Enfants
+    - "\\bVillage\\s+d[’']?Enfants\\s+SOS\\b"
+    - "\\bSOS\\s+Villages?\\s+d[’']?Enfants\\b"
+    - "\\bVillage\\s+Enfants\\s+SOS\\b"
+    - "\\bEnfants\\s+SOS\\b"
+    - "\\bLa\\s+Sauvegarde\\b"
 
   ORG_FONDATION_GENERIC:
     - "\\bFondation\\b"
-    - "\\bŒuvre\\b"
-    - "\\bOeuvre\\b"
+    - "\\bŒuvre\\b|\\bOeuvre\\b"
 
 # ----------------------------------------------------------------
 # ÉTABLISSEMENTS ESSMS (catégories — produisent <ETAB_...>)
@@ -225,9 +256,10 @@ etab_categories:
   # Personnes âgées
   EHPAD:
     - "\\bEHPAD\\b"
+    - "\\bRésidence\\s+Médicalisée\\b"
   RES_AUTONOMIE:
-    - "\\bRésidence(s?)\\s+autonomie\\b"
-    - "\\bFoyer(-|\\s)?logement\\b"
+    - "\\bRésidence(?:s)?\\s+autonomie\\b"
+    - "\\bFoyer(?:-|\\s)?logement\\b"
   ACCUEIL_JOUR_ALZHEIMER:
     - "\\bAccueil\\s+de\\s+jour\\s+Alzheimer\\b"
     - "\\bAccueil\\s+de\\s+jour\\b"
@@ -240,17 +272,17 @@ etab_categories:
     - "\\bFAM\\b"
     - "\\bFoyer\\s+d[’']Accueil\\s+Médicalisé\\b"
   FOYER_VIE:
-    - "\\bFoyer(s?)\\s+de\\s+vie\\b"
+    - "\\bFoyer(?:s)?\\s+de\\s+vie\\b"
   FOYER_HEBERGEMENT:
-    - "\\bFoyer\\s+d[’']Héberg(e)?ment\\b"
+    - "\\bFoyer\\s+d[’']Héberg(?:e)?ment\\b"
   ESMS_EANM:
     - "\\bEANM\\b"
     - "\\bÉtablissement\\s+d[’']Accueil\\s+Non\\s+Médicalisé\\b"
   ESAT:
-    - "\\bESAT\\b"
+    - "\\bESAT\\b|\\bÉSAT\\b"
+    - "\\bÉtablissement\\s+et\\s+Service\\s+d['’]Aide\\s+par\\s+le\\s+Travail\\b"
   EA:
-    - "\\bEA\\b"
-    - "\\bEntreprise\\s+Adaptée\\b"
+    - "\\bEA\\b|\\bEntreprise\\s+Adaptée\\b"
   SAVS:
     - "\\bSAVS\\b"
   SAMSAH:
@@ -260,8 +292,7 @@ etab_categories:
   SPASAD:
     - "\\bSPASAD\\b"
   SAAD:
-    - "\\bSAD\\b"
-    - "\\bSAAD\\b"
+    - "\\bSAD\\b|\\bSAAD\\b"
   PCPE:
     - "\\bPCPE\\b"
 
@@ -270,8 +301,7 @@ etab_categories:
     - "\\bMECS\\b"
     - "\\bMaison\\s+d[’']Enfants\\s+à\\s+Caractère\\s+Social\\b"
   ITEP:
-    - "\\bITEP\\b"
-    - "\\bDITEP\\b"
+    - "\\bI?D?ITEP\\b"
   IME:
     - "\\bIME\\b"
   IMPRO:
@@ -279,7 +309,7 @@ etab_categories:
   IEM:
     - "\\bIEM\\b"
   IES:
-    - "\\bIES\\b"
+    - "\\bIES\\b|\\bInstitut\\s+d['’]Éducation\\s+Sensorielle\\b"
   SESSAD:
     - "\\bSESSAD\\b"
   SAFEP:
@@ -289,22 +319,17 @@ etab_categories:
   EEAP:
     - "\\bEEAP\\b"
   UEMA_UEMI_UEEA:
-    - "\\bUEMA\\b"
-    - "\\bUEMI\\b"
-    - "\\bUEEA\\b"
+    - "\\bUEMA\\b|\\bUEMI\\b|\\bUEEA\\b"
   GEM:
-    - "\\bGEM\\b"
-    - "\\bGroupe\\s+d[’']Entraide\\s+Mutuelle\\b"
+    - "\\bGEM\\b|\\bGroupe\\s+d[’']Entraide\\s+Mutuelle\\b"
 
   # Sanitaire / médico-psy rattaché
   CHU_CH:
-    - "\\bCHU\\b"
-    - "\\bCentre\\s+Hospitalier\\b"
+    - "\\bCHU\\b|\\bCentre\\s+Hospitalier\\b"
   EPSM:
     - "\\bEPSM\\b"
   CMP:
-    - "\\bCMP\\b"
-    - "\\bCentre\\s+Médico\\s+Psychologique\\b"
+    - "\\bCMP\\b|\\bCentre\\s+Médico\\s+Psychologique\\b"
   CMPP:
     - "\\bCMPP\\b"
   CATTP:
@@ -322,40 +347,114 @@ etab_categories:
   HAD:
     - "\\bHAD\\b"
 
+  # Jeunes travailleurs
+  FJT:
+    - "\\bFJT\\b"
+    - "\\bFoyer\\s+(?:de\\s+)?Jeunes?\\s+Travailleur[s]?\\b"
+    - "\\bRésidence\\s+Jeunes\\s+Travailleurs\\b"
+
+  # Établissements scolaires (nouveau)
+  ETAB_SCOLAIRE:
+    - "\\bÉcole\\s+[A-ZÉ][\\w’'\\-]+(?:\\s+[A-ZÉ][\\w’'\\-]+){0,3}\\b"
+    - "\\bCollège\\s+[A-ZÉ][\\w’'\\-]+(?:\\s+[A-ZÉ][\\w’'\\-]+){0,3}\\b"
+    - "\\bLycée\\s+[A-ZÉ][\\w’'\\-]+(?:\\s+[A-ZÉ][\\w’'\\-]+){0,3}\\b"
+
+  # Établissements génériques nommés (poétiques)
+  ETAB_GENERIC:
+    - "\\b(?:Les|La|Le)\\s+(?:Arc-en-Ciel|Horizon|Orée\\s+des\\s+Bois|Autonomie\\s+Sud|Pré\\s+Vert|Val\\s+Fleuri|Tilleuls|Primevères|Acacias)\\b"
+
 # ----------------------------------------------------------------
 # PATRONS GÉNÉRIQUES
 # ----------------------------------------------------------------
 patterns:
   # indice de localité "à/au/aux/dans/sur <Ville>"
-  loc_hint: "\\b(?:à|à la|à l'|à l'|au|aux|dans|sur)\\s+[A-ZÉÈÀÂÎÙÔÇ][\\w\\-'']+"
-  # extraction d'un intitulé (suite de tokens en capitalisation) après le mot-clé de catégorie
-  etab_name_window: "([A-ZÉÈÀÂÎÙÔÇ][\\w\\-'']+(?:\\s+[A-ZÉÈÀÂÎÙÔÇ][\\w\\-'']+){0,5})"
+  loc_hint: "\\b(?:à|à\\s+la|à\\s+l['’]|au|aux|dans|sur)\\s+[A-ZÉÈÀÂÎÙÔÇ][\\w\\-'’]+"
+
+  # stop-mots (évite de taguer en LOC des mots génériques isolés)
+  loc_stopwords:
+    - "\\b(?:avenue|av\\.?|rue|boulevard|bd|impasse|allée|chemin|quai|cours|place|secteur|du|de|des|de\\s+la|de\\s+l’|d’|Jean\\-|Jean|Saint|Sainte)\\b"
+
+  # extraction d'un intitulé (borne pour ne PAS avaler ce qui suit)
+  etab_name_window: >
+    (?:
+      «|\\"|"
+    )?
+    (
+      [A-ZÉÈÀÂÎÙÔÇ][\\w’'-]+
+      (?:
+        \\s+(?:de|du|des|d'|d’)?\\s*[A-ZÉÈÀÂÎÙÔÇ][\\w’'-]+
+      ){0,4}
+    )
+    (?:
+      »|\\"|"
+    )?
+    (?=
+      [\\s\\.,;:\\)\\]]|
+      \\s+(?:à|au|aux|chez|pour|avec|dans|sur|le|la|les|de|des|du|d’|d')|
+      \\s+\\d|
+      \\s*<
+    )
+
+  # nom propre d'établissement sans guillemets (Les/La/Le + Nom)
+  etab_det_nomp: "\\b(?:Les|La|Le)\\s+[A-Z][\\w’'\\-]+(?:\\s+[A-Z][\\w’'\\-]+){0,3}\\b"
+
+  # nom propre suivi d'un type d'établissement entre parenthèses
+  etab_name_then_type: "\\b(?:Les|La|Le)\\s+[A-Z][\\w’'\\-]+(?:\\s+[A-Z][\\w’'\\-]+){0,3}\\s*\\((?:EHPAD|IME|ITEP|MECS|ESAT|FAM|MAS|FJT)\\)\\b"
+
+  # type d'établissement suivi d'un nom propre (avec ville optionnelle)
+  type_then_etab_name: "\\b(?:EHPAD|IME|I?D?ITEP|IES|MECS|ESAT|FAM|MAS|FJT)\\s+(?:Les|La|Le)?\\s*[A-Z][\\w’'\\-]+(?:\\s+[A-Z][\\w’'\\-]+){0,3}(?:\\s+[A-ZÉ][\\w’'\\-]+){0,2}\\b"
+
+# ----------------------------------------------------------------
+# ADRESSES (full vs. rue/voie)
+# ----------------------------------------------------------------
+address_regex:
+  ADDR_FULL:
+    # n°, voie, libellé, CP (4-5 chiffres), ville (quelques mots)
+    - "\\b\\d{1,3}\\s*(?:bis|ter|quater)?\\s+(?:avenue|av\\.?|boulevard|bd|rue|impasse|allée|chemin|quai|cours|route)\\s+[A-ZÉÈÀÂÎÙÔÇ0-9][\\w’'\\- ]{1,80}?\\s+\\d{4,5}\\b\\s+[A-ZÉÈÀÂÎÙÔÇ][\\w’'\\- ]{1,60}\\b"
+    # voie sans numéro mais avec CP+ville
+    - "\\b(?:avenue|av\\.?|boulevard|bd|rue|impasse|allée|chemin|quai|cours|route)\\s+[A-ZÉÈÀÂÎÙÔÇ][\\w’'\\- ]{1,80}?\\s+\\d{4,5}\\b\\s+[A-ZÉÈÀÂÎÙÔÇ][\\w’'\\- ]{1,60}\\b"
+  ADDR_STREET:
+    # n° + voie + libellé (sans CP/ville obligatoire)
+    - "\\b\\d{1,3}\\s*(?:bis|ter|quater)?\\s+(?:avenue|av\\.?|boulevard|bd|rue|impasse|allée|chemin|quai|cours|route)\\s+[A-ZÉÈÀÂÎÙÔÇ0-9][\\w’'\\- ]{1,80}\\b"
+    # voie + libellé (sans numéro)
+    - "\\b(?:avenue|av\\.?|boulevard|bd|rue|impasse|allée|chemin|quai|cours|route)\\s+[A-ZÉÈÀÂÎÙÔÇ][\\w’'\\- ]{1,80}\\b"
 
 # ----------------------------------------------------------------
 # DONNÉES SENSIBLES SPÉCIFIQUES
 # ----------------------------------------------------------------
 date_regex:
   DATE:
-    - "\\b(?:0[1-9]|[12][0-9]|3[01])[./](?:0[1-9]|1[0-2])[./](?:19|20)\\d{2}\\b"  # jj/mm/aaaa ou jj.mm.aaaa
-    - "\\b(?:0[1-9]|[12][0-9]|3[01])[-](?:0[1-9]|1[0-2])[-](?:19|20)\\d{2}\\b"      # jj-mm-aaaa
-    - "\\b(?:19|20)\\d{2}[-](?:0[1-9]|1[0-2])[-](?:0[1-9]|[12][0-9]|3[01])\\b"      # aaaa-mm-jj
+    - "\\b(?:0[1-9]|[12][0-9]|3[01])[./](?:0[1-9]|1[0-2])[./](?:19|20)\\d{2}\\b"
+    - "\\b(?:0[1-9]|[12][0-9]|3[01])-(?:0[1-9]|1[0-2])-(?:19|20)\\d{2}\\b"
+    - "\\b(?:19|20)\\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])\\b"
 
 phone_regex:
   PHONE:
-    - "\\b(?:0[1-9])(?:[.]\\d{2}){4}\\b"          # 01.23.45.67.89
-    - "\\b(?:0[1-9])(?:[-]\\d{2}){4}\\b"          # 01-23-45-67-89
-    - "\\b(?:0[1-9])(?:\\s\\d{2}){4}\\b"          # 01 23 45 67 89
-    - "\\b(?:0[1-9])\\d{8}\\b"                    # 0123456789
+    - "\\b(?:0[1-9])(?:[.]\\d{2}){4}\\b"
+    - "\\b(?:0[1-9])(?:-\\d{2}){4}\\b"
+    - "\\b(?:0[1-9])(?:\\s\\d{2}){4}\\b"
+    - "\\b(?:0[1-9])\\d{8}\\b"
 
 nir_regex:
   NIR:
-    - "\\b\\d{13}\\b"  # NIR simplifié - 13 chiffres
+    - "\\b\\d{13}\\b"
 
 time_regex:
   TIME:
-    - "\\b(?:[01]?[0-9]|2[0-3])h(?:[0-5][0-9])?\\b"              # 14h30, 9h, etc.
-    - "\\b(?:[01]?[0-9]|2[0-3]):(?:[0-5][0-9])\\b"               # 14:30
+    - "\\b(?:[01]?\\d|2[0-3])h(?:[0-5]\\d)?\\b"
+    - "\\b(?:[01]?\\d|2[0-3]):(?:[0-5]\\d)\\b"
+
+# ----------------------------------------------------------------
+# PROFESSIONS ET FONCTIONS
+# ----------------------------------------------------------------
+profession_regex:
+  PROFESSION:
+    - "\\b(Conseillèr(e)?|Assistante\\s+sociale|Éducateur(rice)?\\s+(?:spécialisé|jeunes\\s+enfants)|Psychologue|Ergothérapeute|Orthophoniste|Infirmièr(e)?|Médecin|Directeur(rice)?|Chef\\s+de\\s+service)\\b"
+    - "\\bCESF\\b"
+    - "\\bAS\\b(?!\\s+de)"
+    - "\\bAMP\\b"
+    - "\\bAES\\b"
 
 email_regex:
   EMAIL:
-    - "\\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}\\b"    # email standard
+    - "\\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}\\b"

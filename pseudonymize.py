@@ -11,7 +11,59 @@ import sys
 import yaml
 from pathlib import Path
 from typing import Dict, List, Tuple, Set
-from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
+from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline, CamembertTokenizer
+
+# Import des nouveaux modules d'amélioration
+try:
+    from text_processing import TextNormalizer, StopWordsFilter, PriorityMatrix
+    ENHANCED_MODULES_AVAILABLE = True
+except ImportError:
+    # Fallback si les modules ne sont pas disponibles
+    TextNormalizer = None
+    StopWordsFilter = None
+    PriorityMatrix = None
+    ENHANCED_MODULES_AVAILABLE = False
+
+
+def _norm_key(s: str) -> str:
+    """Normalise une clé pour l'indexation en supprimant les espaces multiples et normalisant les apostrophes"""
+    return re.sub(r"\s+", " ", s.replace("'", "'")).strip()
+
+
+def _is_establishment_name(text: str, context: str) -> bool:
+    """Détermine si un nom ressemble à un établissement basé sur des heuristiques"""
+    # Normaliser le texte
+    norm_text = _norm_key(text)
+    
+    # Heuristique 1: Commence par des articles caractéristiques d'établissements
+    if norm_text.startswith(("Les ", "Le ", "La ", "L'")):
+        # Exclure les écoles générales et les villes connues
+        if (not norm_text.lower().startswith(("école", "collège", "lycée")) and
+            not any(city in norm_text.lower() for city in [
+                "paris", "lyon", "marseille", "toulouse", "nice", "nantes", 
+                "montpellier", "strasbourg", "bordeaux", "lille", "rennes", 
+                "reims", "nanterre", "bobigny", "créteil", "montreuil"
+            ])):
+            return True
+    
+    # Heuristique 2: Contexte contient des verbes indicateurs d'établissement
+    establishment_verbs = [
+        "accueille", "accompagne", "héberge", "prend en charge", "suit", 
+        "oriente", "évalue", "propose", "offre", "dispense", "assure"
+    ]
+    if any(verb in context for verb in establishment_verbs):
+        return True
+    
+    # Heuristique 3: Noms d'arbres/plantes (souvent utilisés pour les établissements)
+    plant_names = [
+        "tilleuls", "peupliers", "chênes", "ormes", "platanes", "érables",
+        "acacias", "cyprès", "pins", "sapins", "bouleaux", "frênes",
+        "roses", "lilas", "jasmin", "glycines", "magnolias"
+    ]
+    if any(plant in norm_text.lower() for plant in plant_names):
+        return True
+    
+    return False
 
 
 class PseudonymStore:
@@ -174,6 +226,7 @@ class RulesEngine:
         self.nir_patterns = {}
         self.time_patterns = {}
         self.email_patterns = {}
+        self.profession_patterns = {}
         self._load_rules()
     
     def _load_rules(self):
@@ -276,8 +329,21 @@ class RulesEngine:
             if compiled_patterns:
                 self.email_patterns[category] = compiled_patterns
         
-        total_patterns = len(self.org_patterns) + len(self.etab_patterns) + len(self.date_patterns) + len(self.phone_patterns) + len(self.nir_patterns) + len(self.time_patterns) + len(self.email_patterns)
-        logging.info(f"✅ Règles chargées: {len(self.org_patterns)} ORG, {len(self.etab_patterns)} ETAB, {len(self.date_patterns)} DATE, {len(self.phone_patterns)} PHONE, {len(self.nir_patterns)} NIR, {len(self.time_patterns)} TIME, {len(self.email_patterns)} EMAIL")
+        # Règles PROFESSION
+        profession_rules = data.get('profession_regex', {})
+        for category, patterns in profession_rules.items():
+            compiled_patterns = []
+            for pattern in patterns:
+                try:
+                    compiled_patterns.append(re.compile(pattern, re.IGNORECASE))
+                except re.error as e:
+                    logging.warning(f"⚠️ Pattern invalide '{pattern}': {e}")
+            
+            if compiled_patterns:
+                self.profession_patterns[category] = compiled_patterns
+        
+        total_patterns = len(self.org_patterns) + len(self.etab_patterns) + len(self.date_patterns) + len(self.phone_patterns) + len(self.nir_patterns) + len(self.time_patterns) + len(self.email_patterns) + len(self.profession_patterns)
+        logging.info(f"✅ Règles chargées: {len(self.org_patterns)} ORG, {len(self.etab_patterns)} ETAB, {len(self.date_patterns)} DATE, {len(self.phone_patterns)} PHONE, {len(self.nir_patterns)} NIR, {len(self.time_patterns)} TIME, {len(self.email_patterns)} EMAIL, {len(self.profession_patterns)} PROFESSION")
     
     def detect_entities(self, text: str) -> List[Dict]:
         """Détecte les entités selon les règles avec gestion des entités composées"""
@@ -357,7 +423,8 @@ class RulesEngine:
             ("phone_patterns", "PHONE"),
             ("nir_patterns", "NIR"),
             ("time_patterns", "TIME"),
-            ("email_patterns", "EMAIL")
+            ("email_patterns", "EMAIL"),
+            ("profession_patterns", "PROFESSION")
         ]
         
         for pattern_attr, label in sensitive_data_types:
@@ -393,9 +460,14 @@ class ChunkedNER:
         """Charge le modèle NER"""
         logging.info(f"🤖 Chargement modèle NER: {self.model_name}")
         
-        # Force l'utilisation du tokenizer lent de CamemBERT pour éviter les problèmes
-        from transformers import CamembertTokenizer
-        self.tokenizer = CamembertTokenizer.from_pretrained(self.model_name)
+        try:
+            # Essayer d'abord avec AutoTokenizer fast
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=True)
+        except Exception as e:
+            logging.warning(f"⚠️ Tokenizer fast échoué, utilisation CamembertTokenizer: {e}")
+            # Fallback vers CamembertTokenizer explicite
+            self.tokenizer = CamembertTokenizer.from_pretrained(self.model_name)
+        
         model = AutoModelForTokenClassification.from_pretrained(self.model_name)
         self.pipeline = pipeline(
             "token-classification", 
@@ -447,7 +519,7 @@ class ChunkedNER:
         
         logging.info(f"📏 Texte divisé en {len(chunks)} chunks")
         return chunks
-    
+
     def detect_entities(self, text: str) -> List[Dict]:
         """Détecte les entités NER avec découpage en chunks"""
         chunks = self._split_into_chunks(text)
@@ -458,10 +530,15 @@ class ChunkedNER:
             
             try:
                 chunk_entities = self.pipeline(chunk_text)
+                logging.debug(f"🔍 Chunk {chunk_idx} NER résultat brut: {chunk_entities}")
                 
                 for entity in chunk_entities:
                     label = entity.get("entity_group")
                     if label in {"PER", "ORG", "LOC"}:
+                        if entity.get("start") is None or entity.get("end") is None:
+                            logging.warning(f"⚠️ Entité avec start/end None: {entity}")
+                            continue
+                            
                         global_start = chunk_start + int(entity["start"])
                         global_end = chunk_start + int(entity["end"])
                         entity_text = text[global_start:global_end]
@@ -487,47 +564,81 @@ class ConflictResolver:
     """Résolveur de conflits entre NER, règles et gazetteers avec système de priorité"""
     
     def __init__(self):
-        # Priorités : plus haut = prioritaire
+        # Priorités : plus haut = prioritaire (matrice améliorée)
         self.priorities = {
-            # Gazetteers - priorité absolue
-            "GAZETTEER_ORG": 5,
-            "GAZETTEER_ETAB": 5,
+            # Données sensibles critiques
+            "RULES_EMAIL": 10.0,
+            "RULES_PHONE": 9.5,
+            "RULES_NIR": 9.4,
+            "ENHANCED_ADDR_FULL": 9.3,
+            "RULES_ADDR_FULL": 9.2,
             
-            # Données sensibles - très prioritaires
-            "RULES_EMAIL": 4,
-            "RULES_NIR": 4,
-            "RULES_PHONE": 4,
-            "RULES_DATE": 4,
-            "RULES_TIME": 4,
+            # Gazetteers - priorité absolue pour entités connues
+            "GAZETTEER_ORG": 9.0,
+            "GAZETTEER_ETAB": 9.0,
             
-            # Établissements spécialisés - haute priorité
-            "RULES_EHPAD": 3.9,
-            "RULES_MAS": 3.9,
-            "RULES_FAM": 3.9,
-            "RULES_SESSAD": 3.9,
-            "RULES_ITEP": 3.9,
-            "RULES_IME": 3.9,
-            "RULES_ESAT": 3.9,
-            "RULES_SAVS": 3.9,
-            "RULES_MECS": 3.9,
+            # Organisations spécialisées (priorité élevée)
+            "RULES_ORG_CHU_CH": 8.5,
+            "ENHANCED_ORG_CHU_CH": 8.5,
+            "RULES_ORG_JUSTICE": 8.4,
+            "RULES_ORG_MDPH": 8.3,
+            "RULES_ORG_ARS": 8.2,
+            "RULES_ORG_DEPARTEMENT": 8.1,
+            "RULES_ORG_PREFECTURE": 8.0,
             
-            # Organisations spécialisées - haute priorité
-            "RULES_ORG_MDPH": 3.8,
-            "RULES_ORG_CAF": 3.8,
-            "RULES_ORG_CHU_CH": 3.8,
-            "RULES_ORG_ARS": 3.8,
-            "RULES_ORG_ASE": 3.8,
-            "RULES_ORG_CPAM": 3.8,
+            # Sources contextuelles (priorité élevée car très fiables)
+            "CONTEXTUAL_PER": 7.9,
+            "CONTEXTUAL_PROFESSION": 7.8,
             
-            # Règles génériques
-            "RULES_ORG": 3,
-            "RULES_ETAB": 3,
+            # Établissements spécialisés
+            "RULES_EHPAD": 7.9,
+            "RULES_IME": 7.8,
+            "RULES_ITEP": 7.7,
+            "RULES_MECS": 7.6,
+            "RULES_ESAT": 7.5,
+            "RULES_PROFESSION": 7.0,  # Priorité élevée pour éviter ORG
             
-            # NER
-            "NER_PER": 2,
-            "NER_ORG": 1,
-            "NER_LOC": 1
+            # Établissements avec noms (ENHANCED)
+            "ENHANCED_ETAB_MECS": 6.8,
+            "ENHANCED_ETAB_IME": 6.7,
+            "ENHANCED_ETAB_ITEP": 6.6,
+            "ENHANCED_ETAB_SESSAD": 6.5,
+            "ENHANCED_ETAB_ESAT": 6.4,
+            "ENHANCED_ETAB_EHPAD": 6.3,
+            "ENHANCED_ETAB_MAS": 6.2,
+            "ENHANCED_ETAB_FAM": 6.1,
+            "ENHANCED_ETAB_FOYER_VIE": 6.0,
+            
+            # Adresses spécialisées
+            "ENHANCED_ADDR_STREET": 5.5,
+            "RULES_ADDR_STREET": 5.4,
+            "ENHANCED_LOC_CITY": 5.0,
+            
+            # Temporel
+            "RULES_DATE": 4.5,
+            "RULES_TIME": 4.4,
+            
+            # Localisation (priorité plus basse)
+            "NER_LOC_CITY": 3.5,
+            "NER_LOC": 3.0,
+            
+            # NER et règles génériques
+            "NER_PER": 2.5,
+            "RULES_ORG": 2.0,
+            "RULES_ETAB": 2.0,
+            "NER_ORG": 1.5,
+            "DEFAULT": 1.0
         }
+        
+        # Initialiser les modules d'amélioration si disponibles
+        if ENHANCED_MODULES_AVAILABLE:
+            self.text_normalizer = TextNormalizer()
+            self.stopwords_filter = StopWordsFilter()
+            self.priority_matrix = PriorityMatrix()
+        else:
+            self.text_normalizer = None
+            self.stopwords_filter = None
+            self.priority_matrix = None
     
     def _calculate_overlap(self, entity1: Dict, entity2: Dict) -> float:
         """Calcule le taux de chevauchement entre deux entités"""
@@ -567,12 +678,222 @@ class ConflictResolver:
         priority_key = self._get_priority_key(entity)
         return self.priorities.get(priority_key, self._get_default_priority(entity))
     
+    def _is_valid_entity(self, entity: Dict) -> bool:
+        """Filtre les entités invalides"""
+        text = entity["text"].strip()
+        
+        # Éliminer les chaînes vides ou trop courtes
+        if len(text) < 2:
+            logging.debug(f"🗑️ Entité trop courte ignorée: '{text}'")
+            return False
+            
+        # Éliminer les entités qui sont juste des lettres isolées pour ORG
+        if entity["label"] == "ORG" and len(text) <= 2 and text.isalpha():
+            logging.debug(f"🗑️ ORG trop court ignoré: '{text}'")
+            return False
+        
+        # Éliminer les abréviations ambiguës sans contexte clair
+        ambiguous_short = ["ME", "C", "M", "AS", "ES", "IS"]
+        if text.strip() in ambiguous_short and entity["label"] in ["ORG", "ETAB"]:
+            logging.debug(f"🗑️ Abréviation ambiguë ignorée: '{text}'")
+            return False
+            
+        # Éliminer les intitulés de fonction/métier 
+        job_titles = [
+            "technicien intervention sociale et familiale",
+            "assistant familial", "éducateur", "psychologue",
+            "travailleur social", "aide soignant", "conseiller",
+            "référent", "coordinateur", "superviseur"
+        ]
+        
+        if any(job in text.lower() for job in job_titles):
+            logging.debug(f"🗑️ Intitulé de fonction ignoré: '{text}'")
+            return False
+        
+        # Éliminer les doublons d'organisations (garder la version la plus spécifique)
+        if entity["label"] == "ORG" and entity.get("category") != "ORG_ENTREPRISE_PRIV":
+            # Si c'est un nom générique d'organisation déjà couvert par une règle spécialisée
+            generic_orgs = ["conseil départemental", "département", "prefecture"]
+            if text.lower() in generic_orgs:
+                logging.debug(f"🗑️ Organisation générique ignorée (règle spécialisée existe): '{text}'")
+                return False
+            
+        return True
+    
+    def _enhance_entity_classification(self, entity: Dict, full_text: str) -> Dict:
+        """Améliore la classification des entités selon le contexte"""
+        text = entity["text"]
+        start = entity["start"]
+        end = entity["end"]
+        
+        # Récupérer le contexte élargi (±50 caractères pour être plus précis)
+        context_start = max(0, start - 50)
+        context_end = min(len(full_text), end + 50)
+        context = full_text[context_start:context_end].lower()
+        
+        # Patterns d'établissements pour expansion PRÉCISE
+        etab_patterns = {
+            "ETAB_MECS": ["mecs", "maison d'enfants"],
+            "ETAB_IME": ["ime"],
+            "ETAB_ITEP": ["itep"],
+            "ETAB_SESSAD": ["sessad"],
+            "ETAB_ESAT": ["esat", "établissement et service d'aide par le travail"],
+            "ETAB_EHPAD": ["ehpad", "résidence médicalisée"],
+            "ETAB_FOYER_VIE": ["foyer de vie"],
+            "ETAB_MAS": ["mas", "maison d'accueil spécialisée"],
+            "ETAB_FAM": ["fam", "foyer d'accueil médicalisé"]
+        }
+        
+        # Patterns pour identifier les adresses
+        address_patterns = [
+            r"\b(?:rue|avenue|boulevard|bd|impasse|place|pl|chemin|allée)\s+",
+            r"\b\d{5}\b",  # Code postal
+            r"\b\d{1,4}(?:bis|ter)?\s+(?:rue|avenue|boulevard|impasse)",
+        ]
+        
+        # Patterns pour identifier les villes
+        city_patterns = [
+            r"\b(?:paris|marseille|lyon|toulouse|nice|nantes|montpellier|strasbourg|bordeaux|lille|rennes|reims|le havre|saint-étienne|toulon|grenoble|dijon|angers|nîmes|villeurbanne|saint-denis|le mans|aix-en-provence|clermont-ferrand|brest|limoges|tours|amiens|perpignan|metz|besançon|boulogne-billancourt|orléans|mulhouse|rouen|caen|nancy|saint-paul|argenteuil|montreuil|roubaix|tourcoing|nanterre|avignon|créteil|dunkerque|poitiers|asnières-sur-seine|versailles|courbevoie|vitry-sur-seine|colombes|pau|aulnay-sous-bois|rueil-malmaison|saint-pierre|antibes|saint-maur-des-fossés|cannes|boulogne-sur-mer|nouméa|calais|drancy|cergy|saint-nazaire|colmar|issy-les-moulineaux|noisy-le-grand|évry|villeneuve-d'ascq|la rochelle|antony|troyes|pessac|ivry-sur-seine|clichy|chambéry|lorient|montauban|niort|sète|vincennes|saint-ouen|la seyne-sur-mer|villejuif|saint-andré|clichy-sous-bois|épinay-sur-seine|meaux|merignac|valence|saint-priest|noisy-le-sec|pantin|vénissieux|caluire-et-cuire|bourges|la courneuve|cholet|sartrouville|mantes-la-jolie|bobigny)\b",
+            r"\b(?:paris\s+\d{1,2})\b"  # Arrondissements parisiens
+        ]
+        
+        import re
+        
+        # Classification des adresses et entités spécialisées
+        if entity["label"] in ["LOC", "ORG"] and entity["source"] == "NER":
+            # D'abord vérifier si c'est un CHU/Centre Hospitalier avant de classer comme ville
+            chu_patterns = [
+                r"\bCHU\s+(?:de\s+)?[A-ZÉ][\w''\-]+(?:\s+[A-ZÉ][\w''\-]+){0,2}\b",
+                r"\b(?:Centre\s+Hospitalier|CHR)\s+(?:de\s+)?[A-ZÉ][\w''\-]+(?:\s+[A-ZÉ][\w''\-]+){0,2}\b"
+            ]
+            
+            for chu_pattern in chu_patterns:
+                if re.search(chu_pattern, text, re.IGNORECASE):
+                    entity["label"] = "ORG_CHU_CH"
+                    entity["category"] = "ORG_CHU_CH"
+                    entity["source"] = "ENHANCED"
+                    logging.debug(f"🏥 CHU detected: '{text}' → ORG_CHU_CH")
+                    return entity
+            
+            # Vérifier si c'est une adresse
+            is_address = any(re.search(pattern, text.lower()) for pattern in address_patterns)
+            if is_address:
+                if re.search(r"\b\d{5}\b", text):
+                    entity["label"] = "ADDR_FULL"
+                    entity["category"] = "ADDR_FULL"
+                else:
+                    entity["label"] = "ADDR_STREET"
+                    entity["category"] = "ADDR_STREET"
+                entity["source"] = "ENHANCED"
+                logging.debug(f"🏠 Address detected: '{text}' → {entity['label']}")
+                return entity
+            
+            # Vérifier si c'est une ville (seulement si pas CHU)
+            is_city = any(re.search(pattern, text.lower()) for pattern in city_patterns)
+            if is_city:
+                entity["label"] = "LOC_CITY"
+                entity["category"] = "LOC_CITY"
+                entity["source"] = "ENHANCED"
+                logging.debug(f"🌍 City detected: '{text}' → LOC_CITY")
+                return entity
+        
+        # Expansion d'établissement UNIQUEMENT si l'ancre est présente dans le contexte proche
+        if entity["label"] == "LOC" and entity["source"] == "NER":
+            for etab_type, keywords in etab_patterns.items():
+                # Vérifier si un mot-clé d'établissement est dans le contexte ET proche (±30 caractères)
+                close_context = full_text[max(0, start - 30):min(len(full_text), end + 30)].lower()
+                if any(keyword in close_context for keyword in keywords):
+                    # Heuristiques d'établissement améliorées
+                    if _is_establishment_name(text, close_context):
+                        logging.debug(f"🏢 LOC→ETAB: '{text}' reclassé comme {etab_type}")
+                        entity["label"] = etab_type
+                        entity["category"] = etab_type
+                        entity["source"] = "ENHANCED"
+                        break
+            
+            # Heuristique ETAB_GENERIC pour noms poétiques sans gazetteer
+            if entity["label"] == "LOC":  # Si pas encore reclassé
+                # Chercher des verbes d'établissement dans le contexte ±50
+                establishment_context_verbs = [
+                    "accueille", "héberge", "admet", "suit", "accompagne", 
+                    "oriente", "inscrit", "logé", "placé", "admis", "suivi", "hébergé"
+                ]
+                extended_context = full_text[max(0, start - 50):min(len(full_text), end + 50)].lower()
+                if any(verb in extended_context for verb in establishment_context_verbs):
+                    if _is_establishment_name(text, extended_context):
+                        logging.debug(f"🏢 LOC→ETAB_GENERIC: '{text}' reclassé comme établissement générique")
+                        entity["label"] = "ETAB_GENERIC"
+                        entity["category"] = "ETAB_GENERIC"
+                        entity["source"] = "ENHANCED"
+
+        # Reclassifier les personnes mal étiquetées comme ORG
+        if entity["label"] == "ORG" and entity["source"] == "NER":
+            # Patterns de noms de personnes
+            name_patterns = [
+                r"\b[A-Z][a-z]+ [A-Z][A-Z]+\b",  # Prénom NOM
+                r"\bM\. [A-Z][A-Z]+\b",          # M. NOM
+                r"\bMme [A-Z][A-Z]+\b",          # Mme NOM
+                r"\bDr\. [A-Z][A-Z]+\b"         # Dr. NOM
+            ]
+            
+            for pattern in name_patterns:
+                if re.search(pattern, text):
+                    logging.debug(f"👤 ORG→PER: '{text}' reclassé comme personne")
+                    entity["label"] = "PER"
+                    entity["source"] = "ENHANCED"
+                    break
+            else:
+                # Si c'est une vraie entreprise, créer catégorie spécialisée
+                if any(word in text.lower() for word in ["carrefour", "auchan", "leclerc", "casino"]):
+                    entity["category"] = "ORG_ENTREPRISE_PRIV"
+                    entity["source"] = "ENHANCED"
+        
+        # Disambiguation PER vs ETAB pour noms propres comme "Jean Piaget"
+        if entity["label"] == "PER" and entity["source"] == "NER":
+            # Chercher des indicateurs d'établissement dans la même phrase
+            sentence_context = full_text[max(0, start - 100):min(len(full_text), end + 100)].lower()
+            etab_indicators = ["ime", "école", "collège", "lycée", "établissement", "institution", "centre"]
+            if any(indicator in sentence_context for indicator in etab_indicators):
+                logging.debug(f"🏢 PER→ETAB_GENERIC: '{text}' reclassé comme établissement (contexte)")
+                entity["label"] = "ETAB_GENERIC"
+                entity["category"] = "ETAB_GENERIC"
+                entity["source"] = "ENHANCED"
+        
+        # Extension CHU : si une entité contient "CHU" et un nom de ville, étendre pour capturer le nom complet
+        if entity["label"] in ["ORG", "LOC"] and entity["source"] == "NER":
+            # Chercher si l'entité actuelle contient "CHU"
+            if "chu" in text.lower():
+                # Examiner le contexte après l'entité pour une éventuelle ville
+                context_after = full_text[end:min(len(full_text), end + 50)]
+                
+                # Chercher une ville immédiatement après (avec espaces possibles)
+                import re
+                city_match = re.search(r'^\s+([A-Z][a-z]+(?:-[A-Z][a-z]+)*)', context_after)
+                if city_match:
+                    city_name = city_match.group(1)
+                    # Vérifier que ce n'est pas un mot courant qui suivrait CHU
+                    excluded_words = ["de", "du", "des", "le", "la", "les", "et", "ou", "avec", "pour"]
+                    if city_name.lower() not in excluded_words:
+                        # Étendre l'entité pour inclure la ville
+                        extended_text = text + " " + city_name
+                        entity["text"] = extended_text
+                        entity["end"] = end + len(city_match.group(0))
+                        entity["label"] = "ORG_CHU_CH"
+                        entity["category"] = "ORG_CHU_CH"
+                        entity["source"] = "ENHANCED"
+                        logging.debug(f"🏥 CHU extended: '{text}' → '{extended_text}' (ORG_CHU_CH)")
+                        return entity
+        
+        return entity
+
     def _get_default_priority(self, entity: Dict) -> float:
         """Retourne une priorité par défaut pour les catégories non définies"""
         source = entity["source"]
         label = entity["label"]
         
-        if source == "GAZETTEER":
+        if source == "ENHANCED":
+            return 4.5  # Priorité élevée pour les améliorations
+        elif source == "GAZETTEER":
             return 5.0
         elif source == "RULES":
             if label in ["EMAIL", "NIR", "PHONE", "DATE", "TIME"]:
@@ -588,19 +909,193 @@ class ConflictResolver:
                 return 2.0
             else:
                 return 1.0
+
+    def _apply_enhanced_filtering(self, text, entities):
+        """Application du filtrage avancé avec les nouvelles classes"""
+        if not ENHANCED_MODULES_AVAILABLE:
+            return entities
+        
+        # 1. Filtrage par stopwords
+        filtered_entities = []
+        for entity in entities:
+            entity_text = text[entity['start']:entity['end']]
+            if not self.stopwords_filter.is_loc_stopword(entity_text):
+                filtered_entities.append(entity)
+            else:
+                logging.debug(f"🚫 Entité filtrée (stopword): '{entity_text}'")
+        
+        # 2. Mise à jour des priorités si la matrice est disponible
+        for entity in filtered_entities:
+            text_content = text[entity['start']:entity['end']]
+            entity_type = entity.get('source', '')
+            enhanced_priority = self.priority_matrix.get_priority(entity_type)
+            if enhanced_priority is not None:
+                entity['priority'] = enhanced_priority
+                logging.debug(f"🔄 Priorité mise à jour: '{text_content}' → {enhanced_priority}")
+        
+        return filtered_entities
+
+    def _contextual_disambiguation(self, full_text, entities):
+        """Désambiguïsation contextuelle pour corriger les classifications évidentes"""
+        if not entities:
+            return entities
+        
+        corrected_entities = []
+        corrections_applied = 0
+        
+        for entity in entities:
+            original_entity = dict(entity)  # Copie pour éviter les modifications
+            entity_text = entity.get('text', '')
+            original_label = entity.get('label', '')
+            source = entity.get('source', '')
+            
+            # Debug: Log toutes les entités ETAB_GENERIC trouvées
+            if (original_label.startswith('ETAB_GENERIC') and 
+                (source.startswith('NER') or source == 'ENHANCED')):  # Inclure les entités reclassées par enhance
+                logging.debug(f"🔍 Entité ETAB_GENERIC détectée: '{entity_text}' source={source} label={original_label}")
+                
+                # Vérifier si c'est un pattern de personne
+                if self._is_person_pattern(entity_text):
+                    logging.debug(f"   ✓ Pattern personne détecté pour '{entity_text}'")
+                    
+                    # Analyse du contexte autour de l'entité (±50 caractères)
+                    context_start = max(0, entity['start'] - 50)
+                    context_end = min(len(full_text), entity['end'] + 50)
+                    context = full_text[context_start:context_end].lower()
+                    
+                    # Vérifier le contexte
+                    if self._has_person_context(context, entity_text):
+                        logging.debug(f"   ✓ Contexte personne confirmé pour '{entity_text}'")
+                        original_entity['label'] = 'PER'
+                        original_entity['source'] = 'CONTEXTUAL_PER'
+                        original_entity['category'] = 'PER'
+                        corrections_applied += 1
+                        logging.info(f"🔄 CORRECTION: '{entity_text}' {original_label} → PER (contexte)")
+                    else:
+                        logging.debug(f"   ✗ Pas de contexte personne pour '{entity_text}'")
+                        logging.debug(f"   Contexte analysé: '{context[:100]}...'")
+                else:
+                    logging.debug(f"   ✗ Pas un pattern personne: '{entity_text}'")
+            
+            # Correction PER → PROFESSION pour les titres
+            elif (original_label == 'PER' or source.startswith('NER_PER')):
+                context_start = max(0, entity['start'] - 50)
+                context_end = min(len(full_text), entity['end'] + 50)
+                context = full_text[context_start:context_end].lower()
+                
+                if self._has_professional_title(context, entity_text):
+                    logging.debug(f"🔄 Correction PER→PROFESSION: '{entity_text}' (titre détecté)")
+                    original_entity['label'] = 'PROFESSION'
+                    original_entity['source'] = 'CONTEXTUAL_PROFESSION'
+                    original_entity['category'] = 'PROFESSION'
+                    corrections_applied += 1
+            
+            corrected_entities.append(original_entity)
+        
+        if corrections_applied > 0:
+            logging.info(f"🎯 Désambiguïsation contextuelle: {corrections_applied} corrections appliquées")
+        else:
+            etab_generic_count = len([e for e in entities if e.get('label', '').startswith('ETAB_GENERIC') and (e.get('source', '').startswith('NER') or e.get('source', '') == 'ENHANCED')])
+            logging.warning(f"⚠️ Désambiguïsation contextuelle: 0 correction appliquée sur {etab_generic_count} entités ETAB_GENERIC candidates")
+        
+        return corrected_entities
     
-    def resolve_conflicts(self, ner_entities: List[Dict], rules_entities: List[Dict], gazetteer_entities: List[Dict] = None) -> List[Dict]:
-        """Résout les conflits entre NER, règles et gazetteers"""
+    def _is_person_pattern(self, text):
+        """Détecte si le texte suit un pattern de nom de personne"""
+        import re
+        
+        # Nettoyer le texte (supprimer espaces et caractères parasites)
+        clean_text = text.strip()
+        
+        # Patterns de noms de personnes avec support des accents
+        patterns = [
+            r'^[A-ZÀ-ÿ][a-zà-ÿ]+\s+[A-ZÀ-ÿ]{2,}$',             # Prénom NOM (toutes majuscules)
+            r'^[A-ZÀ-ÿ][a-zà-ÿ]+\s+[A-ZÀ-ÿ][a-zà-ÿ]+$',       # Prénom Nom (style standard)
+            r'^[A-ZÀ-ÿ]\.\s*[A-ZÀ-ÿ][a-zà-ÿ]+$',               # P. Nom
+            r'^[A-ZÀ-ÿ][a-zà-ÿ]+\s+[A-ZÀ-ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-ÿ][a-zà-ÿ]+)?$',  # Prénom Nom MiddleName
+        ]
+        
+        for pattern in patterns:
+            if re.match(pattern, clean_text):
+                return True
+                
+        return False
+    
+    def _has_person_context(self, context, entity_text):
+        """Vérifie si le contexte indique qu'il s'agit d'une personne"""
+        entity_lower = entity_text.strip().lower()
+        
+        # Civilités directes
+        person_indicators = [
+            f'mme {entity_lower}', f'm. {entity_lower}',
+            f'monsieur {entity_lower}', f'madame {entity_lower}',
+            f'dr {entity_lower}', f'professeur {entity_lower}',
+        ]
+        
+        # Fonctions après le nom
+        function_indicators = [
+            f'{entity_lower}, directeur', f'{entity_lower}, directrice',
+            f'{entity_lower}, responsable', f'{entity_lower}, chef',
+            f'{entity_lower}, tutrice', f'{entity_lower}, tuteur',
+        ]
+        
+        # Âge et caractéristiques personnelles (patterns plus flexibles)
+        age_indicators = [
+            ', ans', ' ans,', f'{entity_lower}, 2', f'{entity_lower}, 3',
+            f'{entity_lower}, 4', f'{entity_lower}, 5', f'{entity_lower}, 6'
+        ]
+        
+        # Vérifier tous les indicateurs
+        all_indicators = person_indicators + function_indicators + age_indicators
+        
+        for indicator in all_indicators:
+            if indicator in context:
+                logging.debug(f"🔍 Indicateur personne trouvé: '{indicator}' pour '{entity_text}'")
+                return True
+        
+        # Debug: afficher le contexte si aucun indicateur trouvé
+        logging.debug(f"🔍 Pas d'indicateur personne pour '{entity_text}' dans: '{context[:100]}...'")
+        return False
+    
+    def _has_professional_title(self, context, entity_text):
+        """Vérifie si le contexte indique une profession"""
+        # Titres professionnels avant le nom
+        titles = ['dr ', 'docteur ', 'professeur ', 'pr ']
+        
+        for title in titles:
+            if f'{title}{entity_text.lower()}' in context:
+                return True
+        
+        return False
+    
+    def resolve_conflicts(self, ner_entities: List[Dict], rules_entities: List[Dict], gazetteer_entities: List[Dict] = None, full_text: str = "") -> List[Dict]:
+        """Résout les conflits entre NER, règles et gazetteers avec filtrage avancé et désambiguïsation"""
         all_entities = ner_entities + rules_entities
         if gazetteer_entities:
             all_entities.extend(gazetteer_entities)
         
+        # Étape 1 : Appliquer le filtrage avancé si disponible  
+        if ENHANCED_MODULES_AVAILABLE and full_text:
+            all_entities = self._apply_enhanced_filtering(full_text, all_entities)
+        
+        # Étape 2 : Filtrer les entités invalides et améliorer la classification
+        valid_entities = []
+        for entity in all_entities:
+            if self._is_valid_entity(entity):
+                # Améliorer la classification
+                enhanced_entity = self._enhance_entity_classification(entity, full_text)
+                valid_entities.append(enhanced_entity)
+        
+        # Étape 3 : Désambiguïsation contextuelle (APRÈS l'amélioration pour corriger les erreurs)
+        if full_text:
+            valid_entities = self._contextual_disambiguation(full_text, valid_entities)
+        
         resolved = []
         
         # Trier par position
-        all_entities.sort(key=lambda x: x["start"])
+        valid_entities.sort(key=lambda x: x["start"])
         
-        for current in all_entities:
+        for current in valid_entities:
             # Vérifier les conflits avec les entités déjà résolues
             conflicts = []
             for resolved_entity in resolved:
@@ -701,6 +1196,14 @@ def main():
     text = Path(args.input).read_text(encoding="utf-8")
     logging.info(f"📖 Texte chargé: {len(text)} caractères")
     
+    # Normalisation Unicode si les modules avancés sont disponibles
+    original_length = len(text)
+    if ENHANCED_MODULES_AVAILABLE:
+        normalizer = TextNormalizer()
+        text = normalizer.normalize_unicode(text)
+        if len(text) != original_length:
+            logging.info(f"🔄 Normalisation Unicode: {original_length} → {len(text)} caractères")
+    
     # Mode dépseudonymisation
     if args.depseudonymize:
         store = PseudonymStore.load(args.load_mapping)
@@ -729,7 +1232,7 @@ def main():
         
         # Résolution des conflits
         resolver = ConflictResolver()
-        final_entities = resolver.resolve_conflicts(ner_entities, rules_entities, gazetteer_entities)
+        final_entities = resolver.resolve_conflicts(ner_entities, rules_entities, gazetteer_entities, text)
         
         # Pseudonymisation
         result = pseudonymize_text(text, final_entities, store)

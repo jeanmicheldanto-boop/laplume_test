@@ -1,19 +1,59 @@
+# Configuration étendue pour pseudonymize.py
+# ============================================
 
-ner_model: Jean-Baptiste/camembert-ner
+# Modèle NER
+ner_model: "Jean-Baptiste/camembert-ner"
+
+# Chemins des ressources
 rules_path: "rules/rules.yaml"
+
+# Gazetteers
 gazetteers:
   national_csv: "gazetteer/gazetteer_national_org.csv"
   bailleurs_csv: "gazetteer/gazetteer_bailleurs.csv"
   keywords_csv: "gazetteer/gazetteer_keywords.csv"
+
+# Seuils de correspondance
 thresholds:
   fuzzy_national: 90
+
+# Politique de traitement des dates
 date_policy:
   mode: "shift"
   shift_days: 17
+
+# Politique de traitement des adresses
 address_policy:
   mask_zip: true
   mask_number_and_street: true
+
+# Catégories avec suffixes locaux
 local_id_suffix_categories:
   - ORG_ASSOC_LOCAL
   - ORG_BAILLEUR_SOC
   - ORG_CCAS_CIAS
+
+# Configuration NER
+ner:
+  chunk_size: 512
+  stride: 50
+  aggregation_strategy: "simple"
+
+# Configuration de sortie
+output:
+  format: "txt"
+  encoding: "utf-8"
+
+# Configuration du mapping
+mapping:
+  save_format: "json"
+  include_metadata: true
+
+# Niveau de logging
+log_level: "INFO"
+
+# Options avancées
+advanced:
+  enable_disambiguation: true
+  enable_enhanced_filtering: true
+  unicode_normalization: true
