@@ -22,13 +22,20 @@ class PseudonymStore:
         self.reverse = {}  # pseudonyme -> original
         self.counters = {"PER": 0, "ORG": 0, "LOC": 0, "ETAB": 0, "DATE": 0, "PHONE": 0, "NIR": 0, "TIME": 0, "EMAIL": 0}
     
-    def pseudonymize(self, text: str, label: str) -> str:
+    def pseudonymize(self, text: str, label: str, category: str = None) -> str:
         """Pseudonymise un texte ou retourne le pseudonyme existant"""
         if text in self.forward:
             return self.forward[text]
         
-        self.counters[label] += 1
-        replacement = f"<{label}_{self.counters[label]}>"
+        # Utiliser la catégorie spécifique si fournie, sinon utiliser le label générique
+        pseudo_label = category if category else label
+        
+        # Créer le compteur pour cette catégorie si nécessaire
+        if pseudo_label not in self.counters:
+            self.counters[pseudo_label] = 0
+            
+        self.counters[pseudo_label] += 1
+        replacement = f"<{pseudo_label}_{self.counters[pseudo_label]}>"
         self.forward[text] = replacement
         self.reverse[replacement] = text
         return replacement
@@ -273,106 +280,100 @@ class RulesEngine:
         logging.info(f"✅ Règles chargées: {len(self.org_patterns)} ORG, {len(self.etab_patterns)} ETAB, {len(self.date_patterns)} DATE, {len(self.phone_patterns)} PHONE, {len(self.nir_patterns)} NIR, {len(self.time_patterns)} TIME, {len(self.email_patterns)} EMAIL")
     
     def detect_entities(self, text: str) -> List[Dict]:
-        """Détecte les entités selon les règles"""
+        """Détecte les entités selon les règles avec gestion des entités composées"""
         entities = []
         
-        # Détecter les ORG
+        # Patterns de localisation pour détecter les entités composées
+        loc_patterns = [
+            r"\b(à|au|aux|dans|sur|de|du|des)\s+[A-ZÉÈÀÂÎÙÔÇ][A-Za-zÀ-ÖØ-öø-ÿ''\-\s]+\b",
+            r"\bde\s+[A-ZÉÈÀÂÎÙÔÇ][A-Za-zÀ-ÖØ-öø-ÿ''\-\s]+\b"
+        ]
+        
+        # Détecter les ORG avec extension géographique
         for category, patterns in self.org_patterns.items():
             for pattern in patterns:
                 for match in pattern.finditer(text):
+                    start, end = match.start(), match.end()
+                    base_text = match.group()
+                    
+                    # Chercher une extension géographique après l'entité
+                    extended_text = base_text
+                    extended_end = end
+                    
+                    # Chercher "de/du/des + lieu" après l'entité de base
+                    remaining_text = text[end:]
+                    for loc_pattern in loc_patterns:
+                        loc_match = re.match(r'\s*' + loc_pattern, remaining_text)
+                        if loc_match:
+                            extension = loc_match.group().strip()
+                            extended_text = base_text + " " + extension
+                            extended_end = end + loc_match.end()
+                            break
+                    
                     entities.append({
-                        "start": match.start(),
-                        "end": match.end(),
-                        "text": match.group(),
+                        "start": start,
+                        "end": extended_end,
+                        "text": extended_text,
                         "label": "ORG",
                         "source": "RULES",
-                        "category": category,
+                        "category": category,  # Catégorie spécifique
                         "score": 1.0
                     })
         
-        # Détecter les ETAB
+        # Détecter les ETAB avec extension géographique
         for category, patterns in self.etab_patterns.items():
             for pattern in patterns:
                 for match in pattern.finditer(text):
+                    start, end = match.start(), match.end()
+                    base_text = match.group()
+                    
+                    # Chercher une extension géographique après l'entité
+                    extended_text = base_text
+                    extended_end = end
+                    
+                    # Chercher "de/du/des + lieu" après l'entité de base
+                    remaining_text = text[end:]
+                    for loc_pattern in loc_patterns:
+                        loc_match = re.match(r'\s*' + loc_pattern, remaining_text)
+                        if loc_match:
+                            extension = loc_match.group().strip()
+                            extended_text = base_text + " " + extension
+                            extended_end = end + loc_match.end()
+                            break
+                    
                     entities.append({
-                        "start": match.start(),
-                        "end": match.end(),
-                        "text": match.group(),
+                        "start": start,
+                        "end": extended_end,
+                        "text": extended_text,
                         "label": "ETAB",
                         "source": "RULES",
-                        "category": category,
+                        "category": category,  # Catégorie spécifique
                         "score": 1.0
                     })
         
-        # Détecter les DATES
-        for category, patterns in self.date_patterns.items():
-            for pattern in patterns:
-                for match in pattern.finditer(text):
-                    entities.append({
-                        "start": match.start(),
-                        "end": match.end(),
-                        "text": match.group(),
-                        "label": "DATE",
-                        "source": "RULES",
-                        "category": category,
-                        "score": 1.0
-                    })
+        # Détecter les autres types de données sensibles (sans extension géographique)
+        sensitive_data_types = [
+            ("date_patterns", "DATE"),
+            ("phone_patterns", "PHONE"),
+            ("nir_patterns", "NIR"),
+            ("time_patterns", "TIME"),
+            ("email_patterns", "EMAIL")
+        ]
         
-        # Détecter les PHONES
-        for category, patterns in self.phone_patterns.items():
-            for pattern in patterns:
-                for match in pattern.finditer(text):
-                    entities.append({
-                        "start": match.start(),
-                        "end": match.end(),
-                        "text": match.group(),
-                        "label": "PHONE",
-                        "source": "RULES",
-                        "category": category,
-                        "score": 1.0
-                    })
-        
-        # Détecter les NIR
-        for category, patterns in self.nir_patterns.items():
-            for pattern in patterns:
-                for match in pattern.finditer(text):
-                    entities.append({
-                        "start": match.start(),
-                        "end": match.end(),
-                        "text": match.group(),
-                        "label": "NIR",
-                        "source": "RULES",
-                        "category": category,
-                        "score": 1.0
-                    })
-        
-        # Détecter les TIME
-        for category, patterns in self.time_patterns.items():
-            for pattern in patterns:
-                for match in pattern.finditer(text):
-                    entities.append({
-                        "start": match.start(),
-                        "end": match.end(),
-                        "text": match.group(),
-                        "label": "TIME",
-                        "source": "RULES",
-                        "category": category,
-                        "score": 1.0
-                    })
-        
-        # Détecter les EMAIL
-        for category, patterns in self.email_patterns.items():
-            for pattern in patterns:
-                for match in pattern.finditer(text):
-                    entities.append({
-                        "start": match.start(),
-                        "end": match.end(),
-                        "text": match.group(),
-                        "label": "EMAIL",
-                        "source": "RULES",
-                        "category": category,
-                        "score": 1.0
-                    })
+        for pattern_attr, label in sensitive_data_types:
+            patterns_dict = getattr(self, pattern_attr, {})
+            for category, patterns in patterns_dict.items():
+                for pattern in patterns:
+                    for match in pattern.finditer(text):
+                        entities.append({
+                            "start": match.start(),
+                            "end": match.end(),
+                            "text": match.group(),
+                            "label": label,
+                            "source": "RULES",
+                            "category": category,
+                            "score": 1.0
+                        })
         
         logging.info(f"🔧 Règles détectées: {len(entities)} entités")
         return entities
@@ -389,10 +390,12 @@ class ChunkedNER:
         self._load_model()
     
     def _load_model(self):
-        """Charge le modèle NER et le tokenizer"""
+        """Charge le modèle NER"""
         logging.info(f"🤖 Chargement modèle NER: {self.model_name}")
         
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=True)
+        # Force l'utilisation du tokenizer lent de CamemBERT pour éviter les problèmes
+        from transformers import CamembertTokenizer
+        self.tokenizer = CamembertTokenizer.from_pretrained(self.model_name)
         model = AutoModelForTokenClassification.from_pretrained(self.model_name)
         self.pipeline = pipeline(
             "token-classification", 
@@ -486,18 +489,44 @@ class ConflictResolver:
     def __init__(self):
         # Priorités : plus haut = prioritaire
         self.priorities = {
-            "GAZETTEER_ORG": 5,    # Gazetteers ont la priorité absolue
-            "GAZETTEER_ETAB": 5,   # Gazetteers ETAB prioritaires
-            "RULES_EMAIL": 4,      # Emails très prioritaires
-            "RULES_NIR": 4,        # NIR très prioritaires  
-            "RULES_PHONE": 4,      # Téléphones très prioritaires
-            "RULES_DATE": 4,       # Dates très prioritaires
-            "RULES_TIME": 4,       # Heures très prioritaires
-            "RULES_ORG": 3,        # Règles ORG prioritaires sur NER
-            "RULES_ETAB": 3,       # Règles ETAB prioritaires
-            "NER_PER": 2,          # NER pour les personnes est fiable
-            "NER_ORG": 1,          # NER ORG moins fiable que règles/gazetteers
-            "NER_LOC": 1           # NER LOC peut être faux pour les orgs
+            # Gazetteers - priorité absolue
+            "GAZETTEER_ORG": 5,
+            "GAZETTEER_ETAB": 5,
+            
+            # Données sensibles - très prioritaires
+            "RULES_EMAIL": 4,
+            "RULES_NIR": 4,
+            "RULES_PHONE": 4,
+            "RULES_DATE": 4,
+            "RULES_TIME": 4,
+            
+            # Établissements spécialisés - haute priorité
+            "RULES_EHPAD": 3.9,
+            "RULES_MAS": 3.9,
+            "RULES_FAM": 3.9,
+            "RULES_SESSAD": 3.9,
+            "RULES_ITEP": 3.9,
+            "RULES_IME": 3.9,
+            "RULES_ESAT": 3.9,
+            "RULES_SAVS": 3.9,
+            "RULES_MECS": 3.9,
+            
+            # Organisations spécialisées - haute priorité
+            "RULES_ORG_MDPH": 3.8,
+            "RULES_ORG_CAF": 3.8,
+            "RULES_ORG_CHU_CH": 3.8,
+            "RULES_ORG_ARS": 3.8,
+            "RULES_ORG_ASE": 3.8,
+            "RULES_ORG_CPAM": 3.8,
+            
+            # Règles génériques
+            "RULES_ORG": 3,
+            "RULES_ETAB": 3,
+            
+            # NER
+            "NER_PER": 2,
+            "NER_ORG": 1,
+            "NER_LOC": 1
         }
     
     def _calculate_overlap(self, entity1: Dict, entity2: Dict) -> float:
@@ -520,13 +549,45 @@ class ConflictResolver:
         """Génère la clé de priorité pour une entité"""
         source = entity["source"]
         label = entity["label"]
+        category = entity.get("category")
         
         if source == "GAZETTEER":
             return f"GAZETTEER_{label}"
         elif source == "RULES":
-            return f"RULES_{label}"
+            # Utiliser la catégorie spécifique si disponible
+            if category:
+                return f"RULES_{category}"
+            else:
+                return f"RULES_{label}"
         else:
             return f"NER_{label}"
+    
+    def _get_priority(self, entity: Dict) -> float:
+        """Retourne la priorité d'une entité"""
+        priority_key = self._get_priority_key(entity)
+        return self.priorities.get(priority_key, self._get_default_priority(entity))
+    
+    def _get_default_priority(self, entity: Dict) -> float:
+        """Retourne une priorité par défaut pour les catégories non définies"""
+        source = entity["source"]
+        label = entity["label"]
+        
+        if source == "GAZETTEER":
+            return 5.0
+        elif source == "RULES":
+            if label in ["EMAIL", "NIR", "PHONE", "DATE", "TIME"]:
+                return 4.0
+            elif label == "ETAB":
+                return 3.5  # Priorité moyenne pour ETAB non spécifique
+            elif label == "ORG":
+                return 3.0  # Priorité pour ORG non spécifique
+            else:
+                return 3.0
+        else:  # NER
+            if label == "PER":
+                return 2.0
+            else:
+                return 1.0
     
     def resolve_conflicts(self, ner_entities: List[Dict], rules_entities: List[Dict], gazetteer_entities: List[Dict] = None) -> List[Dict]:
         """Résout les conflits entre NER, règles et gazetteers"""
@@ -552,11 +613,11 @@ class ConflictResolver:
                 resolved.append(current)
             else:
                 # Résoudre le conflit par priorité
-                current_priority = self.priorities.get(self._get_priority_key(current), 0)
+                current_priority = self._get_priority(current)
                 
                 should_replace = True
                 for conflict in conflicts:
-                    conflict_priority = self.priorities.get(self._get_priority_key(conflict), 0)
+                    conflict_priority = self._get_priority(conflict)
                     if conflict_priority >= current_priority:
                         should_replace = False
                         break
@@ -590,13 +651,15 @@ def pseudonymize_text(text: str, entities: List[Dict], store: PseudonymStore) ->
         start, end = entity["start"], entity["end"]
         original = entity["text"]
         label = entity["label"]
+        category = entity.get("category")  # Récupérer la catégorie spécifique
         
         actual_text = result[start:end]
         if actual_text == original:
-            replacement = store.pseudonymize(original, label)
+            replacement = store.pseudonymize(original, label, category)
             result = result[:start] + replacement + result[end:]
             replacements += 1
-            logging.debug(f"🔄 {original} → {replacement} ({entity.get('source', 'UNK')})")
+            source_info = f"({entity.get('source', 'UNK')})"
+            logging.debug(f"🔄 {original} → {replacement} {source_info}")
         else:
             logging.warning(f"⚠️ Mismatch pos {start}-{end}: '{original}' vs '{actual_text}'")
     

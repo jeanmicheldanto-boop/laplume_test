@@ -53,17 +53,40 @@ Texte → NER Chunking → Règles → Gazetteers → Résolution conflits → P
 
 ## 🚀 Installation et utilisation
 
-### Prérequis
-```bash
-pip install transformers torch pyyaml
+### Option 1 : Script automatique (Windows)
+```powershell
+.\install.ps1
 ```
+
+### Option 2 : Installation manuelle avec environnement virtuel
+```bash
+# Créer l'environnement virtuel dédié
+python -m venv venv_pseudonymize
+
+# Activer l'environnement
+# Windows :
+venv_pseudonymize\Scripts\Activate.ps1
+# Linux/Mac :
+source venv_pseudonymize/bin/activate
+
+# Installer les dépendances
+pip install -r requirements.txt
+```
+
+### Dépendances principales
+- torch >= 2.8.0
+- transformers >= 4.57.0  
+- sentencepiece >= 0.2.1 (requis pour CamemBERT)
+- pandas >= 2.3.3
+- pyyaml >= 6.0.3
+- protobuf >= 6.32.1
 
 ### Configuration de l'environnement
 ```bash
-# Activer l'environnement virtuel
-.venv\Scripts\Activate.ps1  # Windows PowerShell
+# Activer l'environnement virtuel dédié
+venv_pseudonymize\Scripts\Activate.ps1  # Windows PowerShell
 # ou
-source .venv/bin/activate   # Linux/Mac
+source venv_pseudonymize/bin/activate   # Linux/Mac
 ```
 
 ### Utilisation basique
