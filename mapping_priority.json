@@ -1,0 +1,43 @@
+{
+  "forward": {
+    " Assistance Publique Hôpitaux de Paris": "<ORG_1>",
+    " SANOFI": "<ORG_2>",
+    " Dr Marie MARTIN": "<PER_1>",
+    "hôpital Henri-Mondor": "<LOC_1>",
+    " la Gironde": "<LOC_2>",
+    "OPAC": "<ORG_3>",
+    "GOOGLE": "<ORG_4>",
+    "CHU": "<ORG_5>",
+    " PARIS": "<LOC_3>",
+    "MICROSOFT": "<ORG_6>",
+    " Jean DUPONT": "<PER_2>"
+  },
+  "reverse": {
+    "<ORG_1>": " Assistance Publique Hôpitaux de Paris",
+    "<ORG_2>": " SANOFI",
+    "<PER_1>": " Dr Marie MARTIN",
+    "<LOC_1>": "hôpital Henri-Mondor",
+    "<LOC_2>": " la Gironde",
+    "<ORG_3>": "OPAC",
+    "<ORG_4>": "GOOGLE",
+    "<ORG_5>": "CHU",
+    "<LOC_3>": " PARIS",
+    "<ORG_6>": "MICROSOFT",
+    "<PER_2>": " Jean DUPONT"
+  },
+  "counters": {
+    "PER": 2,
+    "ORG": 6,
+    "LOC": 3,
+    "ETAB": 0
+  },
+  "stats": {
+    "total_entities": 11,
+    "per_type": {
+      "PER": 2,
+      "ORG": 6,
+      "LOC": 3,
+      "ETAB": 0
+    }
+  }
+}

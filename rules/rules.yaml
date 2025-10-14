@@ -1,0 +1,361 @@
+# RÈGLES EXTERNES — Pseudonymisation (regex)
+# ------------------------------------------------------------
+# NOTE: toutes les catégories ORG doivent être sous `org_regex:`
+
+org_regex:
+
+  # --- Socle social territorial / institutions locales ---
+  ORG_CCAS_CIAS:
+    - "\\bCCAS\\b"
+    - "\\bCIAS\\b"
+
+  ORG_SIAO:
+    - "\\bSIAO\\b"
+
+  ORG_DEPARTEMENT:
+    - "\\bDépartement\\s+(du|de la|des|de)\\b"
+    - "\\bConseil\\s+départemental\\b"
+
+  ORG_REGION:
+    - "\\bRégion\\b"
+    - "\\bConseil\\s+régional\\b"
+
+  ORG_PREFECTURE:
+    - "\\bPréfecture\\b"
+    - "\\bSous[-\\s]?préfecture\\b"
+
+  ORG_DDETS:
+    - "\\bDDETS(PP)?\\b"
+    - "\\bDirection\\s+d[’'](l’)?emploi\\b"
+
+  ORG_ARS:
+    - "\\bARS\\b"
+    - "\\bAgence\\s+Régionale\\s+de\\s+Santé\\b"
+
+  ORG_ASE:
+    - "\\bASE\\b"
+    - "\\bAide\\s+Sociale\\s+à\\s+l[’']Enfance\\b"
+
+  ORG_PJJ:
+    - "\\bPJJ\\b"
+    - "\\bProtection\\s+Judiciaire\\s+de\\s+la\\s+Jeunesse\\b"
+
+  ORG_MDPH:
+    - "\\bMDPH\\b"
+    - "\\bMaison\\s+Départementale\\s+des\\s+Personnes\\s+Handicapées\\b"
+
+  ORG_PMI:
+    - "\\bPMI\\b"
+    - "\\bProtection\\s+Maternelle\\s+et\\s+Infantile\\b"
+
+  # --- Sécurité sociale / emploi ---
+  ORG_CAF:
+    - "\\bCaisse\\s+d[’']Allocations\\s+Familiales\\b"
+    - "\\bCAF\\b"
+
+  ORG_CPAM:
+    - "\\bCaisse\\s+Primaire\\s+d[’']Assurance\\s+Maladie\\b"
+    - "\\bCPAM\\b"
+
+  ORG_URSSAF:
+    - "\\bURSSAF\\b"
+
+  ORG_MSA:
+    - "\\bMSA\\b"
+    - "\\bMutualité\\s+Sociale\\s+Agricole\\b"
+
+  ORG_CARSAT:
+    - "\\bCARSAT\\b"
+
+  ORG_CNAV:
+    - "\\bCNAV\\b"
+    - "\\bCaisse\\s+Nationale\\s+d[’']Assurance\\s+Vieillesse\\b"
+
+  ORG_POLE_EMPLOI:
+    - "\\bPôle\\s+emploi\\b"
+
+  ORG_AGIRC_ARRCO:
+    - "\\bAGIRC[-\\s]?ARRCO\\b"
+
+  # --- Santé / médico-psy / addictions / accueil ---
+  ORG_CHU_CH:
+    - "\\bCHU\\b"
+    - "\\bCentre\\s+Hospitalier\\b"
+    - "\\bCHR\\b"
+
+  ORG_EPSM:
+    - "\\bEPSM\\b"
+    - "\\bÉtablissement\\s+Public\\s+de\\s+Santé\\s+Mentale\\b"
+
+  ORG_CMP:
+    - "\\bCMP\\b"
+    - "\\bCentre\\s+Médico\\s+Psychologique\\b"
+
+  ORG_CMPP:
+    - "\\bCMPP\\b"
+    - "\\bCentre\\s+Médico\\s+Psycho\\s+Pédagogique\\b"
+
+  ORG_CATTP:
+    - "\\bCATTP\\b"
+    - "\\bCentre\\s+d’Accueil\\s+Thérapeutique\\s+à\\s+Temps\\s+Partiel\\b"
+
+  ORG_CSAPA:
+    - "\\bCSAPA\\b"
+    - "\\bCentre\\s+de\\s+Soin\\s+d’Accompagnement\\s+et\\s+de\\s+Prévention\\s+en\\s+Addictologie\\b"
+
+  ORG_CAARUD:
+    - "\\bCAARUD\\b"
+    - "\\bCentre\\s+d’Accueil\\s+et\\s+d’Accompagnement\\s+à\\s+la\\s+Réduction\\s+des\\s+Risques\\b"
+
+  ORG_PASS:
+    - "\\bPASS\\b"
+    - "\\bPermanence\\s+d’Accès\\s+aux\\s+Soins\\s+de\\s+Santé\\b"
+
+  ORG_MDA:   # Maison des Adolescents
+    - "\\bMDA\\b"
+    - "\\bMaison\\s+des\\s+Adolescents\\b"
+
+  ORG_CAMSP:
+    - "\\bCAMSP\\b"
+    - "\\bCentre\\s+d[’']Action\\s+Médico\\s+Sociale\\s+Précoce\\b"
+
+  # --- Hébergement / asile / insertion ---
+  ORG_CHRS:
+    - "\\bCHRS\\b"
+    - "\\bCentre\\s+d[’']Hébergement\\s+et\\s+de\\s+Réinsertion\\s+Sociale\\b"
+
+  ORG_CADA:
+    - "\\bCADA\\b"
+    - "\\bCentre\\s+d[’']Accueil\\s+de\\s+Demandeurs\\s+d[’']Asile\\b"
+
+  ORG_HUDA:
+    - "\\bHUDA\\b"
+    - "\\bHébergement\\s+d[’']Urgence\\s+pour\\s+Demandeurs\\s+d[’']Asile\\b"
+
+  ORG_PRAHDA:
+    - "\\bPRAHDA\\b"
+
+  ORG_CAO:
+    - "\\bCAO\\b"
+    - "\\bCentre\\s+d[’']Accueil\\s+et\\s+d[’']Orientation\\b"
+
+  # --- Bailleurs sociaux / logement ---
+  ORG_BAILLEUR_SOC:
+    - "\\bOPH(\\s+de\\s+[A-ZÉ][A-Za-zÀ-ÖØ-öø-ÿ'’\\- ]+)?\\b"
+    - "\\bOPAC\\b"
+    - "\\bOPHLM\\b"
+    - "\\b(Office|Offices?)\\s+Public(s)?\\s+(?:d’|d')?Habitat\\b"
+    - "\\bESH\\b"
+    - "\\bS(?:A|A\\.?)\\s*HLM\\b"
+    - "\\bHabitat\\s+\\d{2}\\b"
+    - "\\b(Habitat|HLM)\\b"
+    - "\\bCDC\\s+Habitat\\b"
+
+  # --- Financiers (resserrés) ---
+  ORG_FINANCIER:
+    - "\\bBanque\\s+(Populaire|Postale|Palatine|Tarneaud|Courtois|\\w+)\\b"
+    - "\\bCrédit\\s+(Mutuel|Agricole|Coopératif)\\b"
+    - "\\bSociété\\s+Générale\\b"
+    - "\\bBNP\\s+Paribas\\b"
+    - "\\bCofidis\\b"
+    - "\\bCetelem\\b"
+    - "\\bOney\\b"
+    - "\\bFloabank\\b"
+
+  # --- Grandes associations / fondations nationales ---
+  ORG_CROIX_ROUGE:
+    - "\\bCroix[-\\s]Rouge\\s+française\\b"
+
+  ORG_EMMAUS:
+    - "\\bEmma[üu]s\\b"
+
+  ORG_SECOURS_POP:
+    - "\\bSecours\\s+Populaire\\b"
+
+  ORG_SECOURS_CATHO:
+    - "\\bSecours\\s+Catholique\\b"
+    - "\\bCaritas\\b"
+
+  ORG_FONDATION_ABBE_PIERRE:
+    - "\\bFondation\\s+Abbé\\s+Pierre\\b"
+
+  ORG_ARMEE_SALUT:
+    - "\\bArmée\\s+du\\s+Salut\\b"
+
+  ORG_APF:
+    - "\\bAPF\\s+France\\s+handicap\\b"
+
+  ORG_UNAPEI:
+    - "\\bUNAPEI\\b"
+    - "\\bADAPEI\\b"
+    - "\\bAPEI\\b"
+
+  ORG_ASEI:
+    - "\\bASEI\\b"
+    - "\\bAssociation\\s+au\\s+Service\\s+de\\s+l[’']Enfance\\s+Inadaptée\\b"
+
+  ORG_APAJH:
+    - "\\bAPAJH\\b"
+
+  ORG_AFM_TELETHON:
+    - "\\bAFM\\s+Téléthon\\b"
+
+  ORG_SAUVEGARDE:
+    - "\\bSauvegarde\\s+(\\d{2}|[A-ZÉ][A-Za-zÀ-ÖØ-öø-ÿ'’\\- ]+)\\b"
+
+  # --- Associations / fondations génériques (locales) ---
+  ORG_ASSOC_GENERIC:
+    - "\\bAssociation\\b"
+    - "\\bAsso\\.?\\b"
+    - "\\bSolidarité\\b"
+    - "\\bInsertion\\b"
+    - "\\bRelais\\s+Insertion\\s+\\d{2}\\b"
+    - "\\bMosaïque\\s+Service\\s+Social\\b"
+
+  ORG_FONDATION_GENERIC:
+    - "\\bFondation\\b"
+    - "\\bŒuvre\\b"
+    - "\\bOeuvre\\b"
+
+# ----------------------------------------------------------------
+# ÉTABLISSEMENTS ESSMS (catégories — produisent <ETAB_...>)
+# ----------------------------------------------------------------
+etab_categories:
+
+  # Personnes âgées
+  EHPAD:
+    - "\\bEHPAD\\b"
+  RES_AUTONOMIE:
+    - "\\bRésidence(s?)\\s+autonomie\\b"
+    - "\\bFoyer(-|\\s)?logement\\b"
+  ACCUEIL_JOUR_ALZHEIMER:
+    - "\\bAccueil\\s+de\\s+jour\\s+Alzheimer\\b"
+    - "\\bAccueil\\s+de\\s+jour\\b"
+
+  # Handicap (adultes/enfants)
+  MAS:
+    - "\\bMAS\\b"
+    - "\\bMaison\\s+d[’']Accueil\\s+Spécialisée\\b"
+  FAM:
+    - "\\bFAM\\b"
+    - "\\bFoyer\\s+d[’']Accueil\\s+Médicalisé\\b"
+  FOYER_VIE:
+    - "\\bFoyer(s?)\\s+de\\s+vie\\b"
+  FOYER_HEBERGEMENT:
+    - "\\bFoyer\\s+d[’']Héberg(e)?ment\\b"
+  ESMS_EANM:
+    - "\\bEANM\\b"
+    - "\\bÉtablissement\\s+d[’']Accueil\\s+Non\\s+Médicalisé\\b"
+  ESAT:
+    - "\\bESAT\\b"
+  EA:
+    - "\\bEA\\b"
+    - "\\bEntreprise\\s+Adaptée\\b"
+  SAVS:
+    - "\\bSAVS\\b"
+  SAMSAH:
+    - "\\bSAMSAH\\b"
+  SSIAD:
+    - "\\bSSIAD\\b"
+  SPASAD:
+    - "\\bSPASAD\\b"
+  SAAD:
+    - "\\bSAD\\b"
+    - "\\bSAAD\\b"
+  PCPE:
+    - "\\bPCPE\\b"
+
+  # Enfance / éducation spécialisée
+  MECS:
+    - "\\bMECS\\b"
+    - "\\bMaison\\s+d[’']Enfants\\s+à\\s+Caractère\\s+Social\\b"
+  ITEP:
+    - "\\bITEP\\b"
+    - "\\bDITEP\\b"
+  IME:
+    - "\\bIME\\b"
+  IMPRO:
+    - "\\bIMPRO\\b"
+  IEM:
+    - "\\bIEM\\b"
+  IES:
+    - "\\bIES\\b"
+  SESSAD:
+    - "\\bSESSAD\\b"
+  SAFEP:
+    - "\\bSAFEP\\b"
+  SSEFS:
+    - "\\bSSEFS\\b"
+  EEAP:
+    - "\\bEEAP\\b"
+  UEMA_UEMI_UEEA:
+    - "\\bUEMA\\b"
+    - "\\bUEMI\\b"
+    - "\\bUEEA\\b"
+  GEM:
+    - "\\bGEM\\b"
+    - "\\bGroupe\\s+d[’']Entraide\\s+Mutuelle\\b"
+
+  # Sanitaire / médico-psy rattaché
+  CHU_CH:
+    - "\\bCHU\\b"
+    - "\\bCentre\\s+Hospitalier\\b"
+  EPSM:
+    - "\\bEPSM\\b"
+  CMP:
+    - "\\bCMP\\b"
+    - "\\bCentre\\s+Médico\\s+Psychologique\\b"
+  CMPP:
+    - "\\bCMPP\\b"
+  CATTP:
+    - "\\bCATTP\\b"
+  CSAPA:
+    - "\\bCSAPA\\b"
+  CAARUD:
+    - "\\bCAARUD\\b"
+  PASS:
+    - "\\bPASS\\b"
+  CAMSP:
+    - "\\bCAMSP\\b"
+  PCO:
+    - "\\bPlateforme\\s+de\\s+Coordination\\s+et\\s+d[’']Orientation\\b"
+  HAD:
+    - "\\bHAD\\b"
+
+# ----------------------------------------------------------------
+# PATRONS GÉNÉRIQUES
+# ----------------------------------------------------------------
+patterns:
+  # indice de localité "à/au/aux/dans/sur <Ville>"
+  loc_hint: "\\b(?:à|à la|à l'|à l'|au|aux|dans|sur)\\s+[A-ZÉÈÀÂÎÙÔÇ][\\w\\-'']+"
+  # extraction d'un intitulé (suite de tokens en capitalisation) après le mot-clé de catégorie
+  etab_name_window: "([A-ZÉÈÀÂÎÙÔÇ][\\w\\-'']+(?:\\s+[A-ZÉÈÀÂÎÙÔÇ][\\w\\-'']+){0,5})"
+
+# ----------------------------------------------------------------
+# DONNÉES SENSIBLES SPÉCIFIQUES
+# ----------------------------------------------------------------
+date_regex:
+  DATE:
+    - "\\b(?:0[1-9]|[12][0-9]|3[01])[./](?:0[1-9]|1[0-2])[./](?:19|20)\\d{2}\\b"  # jj/mm/aaaa ou jj.mm.aaaa
+    - "\\b(?:0[1-9]|[12][0-9]|3[01])[-](?:0[1-9]|1[0-2])[-](?:19|20)\\d{2}\\b"      # jj-mm-aaaa
+    - "\\b(?:19|20)\\d{2}[-](?:0[1-9]|1[0-2])[-](?:0[1-9]|[12][0-9]|3[01])\\b"      # aaaa-mm-jj
+
+phone_regex:
+  PHONE:
+    - "\\b(?:0[1-9])(?:[.]\\d{2}){4}\\b"          # 01.23.45.67.89
+    - "\\b(?:0[1-9])(?:[-]\\d{2}){4}\\b"          # 01-23-45-67-89
+    - "\\b(?:0[1-9])(?:\\s\\d{2}){4}\\b"          # 01 23 45 67 89
+    - "\\b(?:0[1-9])\\d{8}\\b"                    # 0123456789
+
+nir_regex:
+  NIR:
+    - "\\b\\d{13}\\b"  # NIR simplifié - 13 chiffres
+
+time_regex:
+  TIME:
+    - "\\b(?:[01]?[0-9]|2[0-3])h(?:[0-5][0-9])?\\b"              # 14h30, 9h, etc.
+    - "\\b(?:[01]?[0-9]|2[0-3]):(?:[0-5][0-9])\\b"               # 14:30
+
+email_regex:
+  EMAIL:
+    - "\\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}\\b"    # email standard

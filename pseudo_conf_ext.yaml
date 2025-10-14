@@ -1,0 +1,19 @@
+
+ner_model: Jean-Baptiste/camembert-ner
+rules_path: "rules/rules.yaml"
+gazetteers:
+  national_csv: "gazetteer/gazetteer_national_org.csv"
+  bailleurs_csv: "gazetteer/gazetteer_bailleurs.csv"
+  keywords_csv: "gazetteer/gazetteer_keywords.csv"
+thresholds:
+  fuzzy_national: 90
+date_policy:
+  mode: "shift"
+  shift_days: 17
+address_policy:
+  mask_zip: true
+  mask_number_and_street: true
+local_id_suffix_categories:
+  - ORG_ASSOC_LOCAL
+  - ORG_BAILLEUR_SOC
+  - ORG_CCAS_CIAS
