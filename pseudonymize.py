@@ -840,7 +840,8 @@ class ConflictResolver:
             # Types d'établissements qui nécessitent une fusion (à vérifier AVANT reclassification)
             fusion_types = ['EHPAD', 'MAS', 'FAM', 'MECS', 'IME', 'ITEP', 'SESSAD',
                            'ESAT', 'CMPP', 'CAMSP', 'FJT', 'CHRS', 'IMPRO', 'IEM', 
-                           'IES', 'SAFEP', 'SSEFS', 'EEAP']
+                           'IES', 'SAFEP', 'SSEFS', 'EEAP',
+                           'SAVS', 'SAMSAH', 'SSIAD']  # Noms courts pour détection préfixe
             
             # Vérifier si un TYPE d'établissement est immédiatement AVANT (gap ≤ 3 caractères)
             prefix_context = full_text[max(0, start - 15):start].strip().upper()
@@ -871,6 +872,34 @@ class ConflictResolver:
             # Si type établissement adjacent, préserver LOC pour fusion
             if has_adjacent_type:
                 logging.debug(f"🔗 LOC '{text}' préservé pour fusion avec TYPE adjacent (évite reclassification ville/adresse)")
+        
+        # Détecter si le NER a capturé TYPE+NOM ensemble (ex: "SESSAD Arc-en-Ciel")
+        if entity["label"] == "LOC" and entity["source"] == "NER":
+            # Types d'établissements à détecter dans le texte NER
+            etab_type_patterns = {
+                'ETAB_SESSAD': ['SESSAD'],
+                'ETAB_EHPAD': ['EHPAD'],
+                'ETAB_IME': ['IME'],
+                'ETAB_MECS': ['MECS'],
+                'ETAB_CHRS': ['CHRS'],
+                'ETAB_CMPP': ['CMPP'],
+                'ETAB_SAVS': ['SAVS'],
+                'ETAB_SAMSAH': ['SAMSAH'],
+                'ETAB_MAS': ['MAS'],
+                'ETAB_FAM': ['FAM'],
+                'ETAB_ITEP': ['ITEP'],
+                'ETAB_ESAT': ['ESAT'],
+            }
+            
+            # Vérifier si le texte commence par un type d'établissement
+            text_upper = text.upper()
+            for etab_category, keywords in etab_type_patterns.items():
+                if any(text_upper.startswith(kw) for kw in keywords):
+                    logging.debug(f"🏢 NER TYPE+NOM: '{text}' reclassé comme {etab_category}")
+                    entity["label"] = etab_category
+                    entity["category"] = etab_category
+                    entity["source"] = "NER_ENHANCED"
+                    return entity
         
         # Expansion d'établissement UNIQUEMENT si l'ancre est présente dans le contexte proche
         # ET que le TYPE d'établissement n'est PAS déjà adjacent (fusion gérée séparément)
@@ -1140,12 +1169,12 @@ class ConflictResolver:
         ETAB_TYPES = {
             'EHPAD', 'MAS', 'FAM', 'MECS', 'IME', 'ITEP', 'SESSAD',
             'ESAT', 'CMPP', 'CAMSP', 'FJT', 'CHRS', 'IMPRO', 'IEM', 
-            'IES', 'SAFEP', 'SSEFS', 'EEAP'
+            'IES', 'SAFEP', 'SSEFS', 'EEAP',
+            'SERVICE_SAVS', 'SERVICE_SAMSAH', 'SERVICE_SSIAD'  # Services avec noms propres (ex: SAVS "Les Passerelles")
         }
         
-        # Services NON pseudonymisables (restent tels quels)
+        # Services NON pseudonymisables (génériques sans nom propre)
         SERVICE_TYPES = {
-            'SERVICE_SAVS', 'SERVICE_SAMSAH', 'SERVICE_SSIAD', 
             'SERVICE_SPASAD', 'SERVICE_SAAD', 'SERVICE_CMP',
             'SERVICE_CATTP', 'SERVICE_CSAPA', 'SERVICE_CAARUD', 'SERVICE_PASS'
         }
@@ -1177,7 +1206,7 @@ class ConflictResolver:
                 is_adjacent_name = (
                     next_entity['label'] in {'LOC', 'PER'} and
                     next_entity['source'] == 'NER' and
-                    gap <= 3  # Max 3 chars d'écart (pour "l'", " ", etc.)
+                    gap <= 6  # Max 6 chars: guillemets normalisés " ", espaces, apostrophes
                 )
                 
                 # Log pour debug
@@ -1278,23 +1307,32 @@ class ConflictResolver:
                 # Pas de conflit, ajouter directement
                 resolved.append(current)
             else:
-                # Résoudre le conflit par priorité
+                # Résoudre le conflit : LONGEST-SPAN-WINS d'abord, puis priorité
+                current_length = current['end'] - current['start']
                 current_priority = self._get_priority(current)
                 
                 should_replace = True
                 for conflict in conflicts:
+                    conflict_length = conflict['end'] - conflict['start']
                     conflict_priority = self._get_priority(conflict)
-                    if conflict_priority >= current_priority:
+                    
+                    # Règle 1 : Longest-span-wins (si différence > 3 chars)
+                    if abs(current_length - conflict_length) > 3:
+                        if conflict_length > current_length:
+                            should_replace = False
+                            break
+                    # Règle 2 : Si longueurs similaires, utiliser la priorité
+                    elif conflict_priority >= current_priority:
                         should_replace = False
                         break
                 
                 if should_replace:
-                    # Retirer les entités conflictuelles moins prioritaires
+                    # Retirer les entités conflictuelles moins prioritaires/courtes
                     for conflict in conflicts:
                         resolved.remove(conflict)
                     resolved.append(current)
                     
-                    logging.debug(f"🔄 Conflit résolu: '{current['text']}' ({self._get_priority_key(current)}) remplace {len(conflicts)} entité(s)")
+                    logging.debug(f"🔄 Conflit résolu: '{current['text']}' ({self._get_priority_key(current)}, len={current_length}) remplace {len(conflicts)} entité(s)")
         
         # Statistiques
         stats = {}
@@ -1367,6 +1405,14 @@ def main():
     
     # Charger le texte
     text = Path(args.input).read_text(encoding="utf-8")
+    
+    # Supprimer les guillemets typographiques pour améliorer la détection NER
+    # (les guillemets confondent le NER qui inclut le type d'établissement dans la détection)
+    original_text = text
+    text = text.replace('«', '').replace('»', '').replace('"', '').replace('"', '').replace('"', '')
+    
+    if text != original_text:
+        logging.info(f"📝 Guillemets supprimés pour améliorer détection NER")
     logging.info(f"📖 Texte chargé: {len(text)} caractères")
     
     # Normalisation Unicode si les modules avancés sont disponibles

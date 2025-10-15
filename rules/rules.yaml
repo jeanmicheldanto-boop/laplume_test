@@ -315,8 +315,9 @@ etab_categories:
     - "\\b[Ii]nstitut\\s+d['']Ã‰ducation\\s+Sensorielle\\b"
   
   SESSAD:
+    - "\\bSESSAD\\s+TED\\b"  # SESSAD spécialisé TED (Troubles Envahissants du Développement)
     - "\\bSESSAD\\b"
-    - "\\b[Ss]ervice\\s+d['']Ã‰ducation\\s+SpÃ©ciale\\s+et\\s+de\\s+Soins\\s+Ã \\s+Domicile\\b"
+    - "\\b[Ss]ervice\\s+d['']Éducation\\s+Spéciale\\s+et\\s+de\\s+Soins\\s+à\\s+Domicile\\b"
   
   SAFEP:
     - "\\bSAFEP\\b"
