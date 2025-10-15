@@ -1,0 +1,37 @@
+{
+  "forward": {
+    "EHPAD": "<EHPAD_1>",
+    "﻿Mme X": "<PER_1>"
+  },
+  "reverse": {
+    "<EHPAD_1>": "EHPAD",
+    "<PER_1>": "﻿Mme X"
+  },
+  "counters": {
+    "PER": 1,
+    "ORG": 0,
+    "LOC": 0,
+    "ETAB": 0,
+    "DATE": 0,
+    "PHONE": 0,
+    "NIR": 0,
+    "TIME": 0,
+    "EMAIL": 0,
+    "EHPAD": 1
+  },
+  "stats": {
+    "total_entities": 2,
+    "per_type": {
+      "PER": 1,
+      "ORG": 0,
+      "LOC": 0,
+      "ETAB": 0,
+      "DATE": 0,
+      "PHONE": 0,
+      "NIR": 0,
+      "TIME": 0,
+      "EMAIL": 0,
+      "EHPAD": 1
+    }
+  }
+}

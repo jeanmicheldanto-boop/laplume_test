@@ -1,0 +1,19 @@
+name,category,reason
+banque refuse,EXCLUDE,verbe d'action (la banque refuse de...)
+école signale,EXCLUDE,verbe d'action (l'école signale...)
+Diogène,EXCLUDE,syndrome de Diogène (pathologie)
+habitat et d'un accompagnement,EXCLUDE,description verbale
+habitat,EXCLUDE,terme générique seul
+du,EXCLUDE,article partitif seul
+de la,EXCLUDE,article partitif seul
+de l,EXCLUDE,article partitif seul
+Les,EXCLUDE,article défini seul
+Pôle,EXCLUDE,mot générique seul
+Industrie,EXCLUDE,mot générique seul
+rue de l,EXCLUDE,fragment d'adresse incomplet
+du Clos,EXCLUDE,fragment d'adresse incomplet
+du Lavoir,EXCLUDE,fragment d'adresse incomplet
+du Moulin,EXCLUDE,fragment d'adresse incomplet
+des Glycines,EXCLUDE,fragment d'adresse incomplet
+Abord,EXCLUDE,fragment de "Toit d'Abord"
+Toit d,EXCLUDE,fragment de "Toit d'Abord"

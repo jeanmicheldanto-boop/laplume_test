@@ -181,8 +181,13 @@ class GazetteerEngine:
     def detect_entities(self, text: str) -> List[Dict]:
         """Détecte les entités selon les gazetteers par correspondance exacte"""
         entities = []
+        exclusions_count = 0
         
         for gazetteer_name, entries in self.gazetteers.items():
+            # Traiter gazetteer_exclusions séparément (ne pas créer d'entités)
+            if gazetteer_name == 'gazetteer_exclusions':
+                continue
+                
             for entry in entries:
                 name = entry['name']
                 category = entry['category']
@@ -191,6 +196,13 @@ class GazetteerEngine:
                 pattern = r'\b' + re.escape(name) + r'\b'
                 
                 for match in re.finditer(pattern, text, re.IGNORECASE):
+                    # Trim le texte détecté
+                    matched_text = match.group().strip()
+                    
+                    # Ignorer si vide après trim ou trop court (< 2 chars sauf codes)
+                    if not matched_text or (len(matched_text) < 2 and not category.endswith('_CP')):
+                        continue
+                    
                     # Déterminer le label final
                     if category.startswith('ORG_'):
                         label = 'ORG'
@@ -202,7 +214,7 @@ class GazetteerEngine:
                     entities.append({
                         "start": match.start(),
                         "end": match.end(),
-                        "text": match.group(),
+                        "text": matched_text,  # Utiliser le texte trimé
                         "label": label,
                         "source": "GAZETTEER",
                         "category": category,
@@ -329,21 +341,15 @@ class RulesEngine:
             if compiled_patterns:
                 self.email_patterns[category] = compiled_patterns
         
-        # Règles PROFESSION
-        profession_rules = data.get('profession_regex', {})
-        for category, patterns in profession_rules.items():
-            compiled_patterns = []
-            for pattern in patterns:
-                try:
-                    compiled_patterns.append(re.compile(pattern, re.IGNORECASE))
-                except re.error as e:
-                    logging.warning(f"⚠️ Pattern invalide '{pattern}': {e}")
-            
-            if compiled_patterns:
-                self.profession_patterns[category] = compiled_patterns
+        # NOTE: Professions supprimées - ne pas pseudonymiser les professions (risque de ré-identification)
         
-        total_patterns = len(self.org_patterns) + len(self.etab_patterns) + len(self.date_patterns) + len(self.phone_patterns) + len(self.nir_patterns) + len(self.time_patterns) + len(self.email_patterns) + len(self.profession_patterns)
-        logging.info(f"✅ Règles chargées: {len(self.org_patterns)} ORG, {len(self.etab_patterns)} ETAB, {len(self.date_patterns)} DATE, {len(self.phone_patterns)} PHONE, {len(self.nir_patterns)} NIR, {len(self.time_patterns)} TIME, {len(self.email_patterns)} EMAIL, {len(self.profession_patterns)} PROFESSION")
+        total_patterns = (len(self.org_patterns) + len(self.etab_patterns) + len(self.date_patterns) + 
+                         len(self.phone_patterns) + len(self.nir_patterns) + len(self.time_patterns) + 
+                         len(self.email_patterns))
+        logging.info(f"✅ Règles chargées: {len(self.org_patterns)} ORG, {len(self.etab_patterns)} ETAB, "
+                    f"{len(self.date_patterns)} DATE, {len(self.phone_patterns)} PHONE, "
+                    f"{len(self.nir_patterns)} NIR, {len(self.time_patterns)} TIME, "
+                    f"{len(self.email_patterns)} EMAIL")
     
     def detect_entities(self, text: str) -> List[Dict]:
         """Détecte les entités selon les règles avec gestion des entités composées"""
@@ -360,7 +366,15 @@ class RulesEngine:
             for pattern in patterns:
                 for match in pattern.finditer(text):
                     start, end = match.start(), match.end()
-                    base_text = match.group()
+                    base_text = match.group().strip()  # Trim le texte de base
+                    
+                    if not base_text:  # Ignorer si vide après trim
+                        continue
+                    
+                    # Ajuster les positions après trim
+                    left_strip = len(match.group()) - len(match.group().lstrip())
+                    start = start + left_strip
+                    end = start + len(base_text)
                     
                     # Chercher une extension géographique après l'entité
                     extended_text = base_text
@@ -391,7 +405,15 @@ class RulesEngine:
             for pattern in patterns:
                 for match in pattern.finditer(text):
                     start, end = match.start(), match.end()
-                    base_text = match.group()
+                    base_text = match.group().strip()  # Trim le texte de base
+                    
+                    if not base_text:  # Ignorer si vide après trim
+                        continue
+                    
+                    # Ajuster les positions après trim
+                    left_strip = len(match.group()) - len(match.group().lstrip())
+                    start = start + left_strip
+                    end = start + len(base_text)
                     
                     # Chercher une extension géographique après l'entité
                     extended_text = base_text
@@ -418,13 +440,13 @@ class RulesEngine:
                     })
         
         # Détecter les autres types de données sensibles (sans extension géographique)
+        # NOTE: profession_patterns retiré - ne pas pseudonymiser les professions
         sensitive_data_types = [
             ("date_patterns", "DATE"),
             ("phone_patterns", "PHONE"),
             ("nir_patterns", "NIR"),
             ("time_patterns", "TIME"),
-            ("email_patterns", "EMAIL"),
-            ("profession_patterns", "PROFESSION")
+            ("email_patterns", "EMAIL")
         ]
         
         for pattern_attr, label in sensitive_data_types:
@@ -432,10 +454,20 @@ class RulesEngine:
             for category, patterns in patterns_dict.items():
                 for pattern in patterns:
                     for match in pattern.finditer(text):
+                        # Trim le texte détecté
+                        matched_text = match.group().strip()
+                        if not matched_text:  # Ignorer si vide après trim
+                            continue
+                        
+                        # Calculer les vraies positions après trim
+                        left_strip = len(match.group()) - len(match.group().lstrip())
+                        start_trimmed = match.start() + left_strip
+                        end_trimmed = start_trimmed + len(matched_text)
+                        
                         entities.append({
-                            "start": match.start(),
-                            "end": match.end(),
-                            "text": match.group(),
+                            "start": start_trimmed,
+                            "end": end_trimmed,
+                            "text": matched_text,
                             "label": label,
                             "source": "RULES",
                             "category": category,
@@ -543,10 +575,20 @@ class ChunkedNER:
                         global_end = chunk_start + int(entity["end"])
                         entity_text = text[global_start:global_end]
                         
+                        # 🔧 Trim le texte et ajuster les positions
+                        entity_text_trimmed = entity_text.strip()
+                        if not entity_text_trimmed:  # Ignorer si vide après trim
+                            continue
+                        
+                        # Calculer le décalage dû au trim
+                        left_strip = len(entity_text) - len(entity_text.lstrip())
+                        global_start_trimmed = global_start + left_strip
+                        global_end_trimmed = global_start_trimmed + len(entity_text_trimmed)
+                        
                         all_entities.append({
-                            "start": global_start,
-                            "end": global_end,
-                            "text": entity_text,
+                            "start": global_start_trimmed,
+                            "end": global_end_trimmed,
+                            "text": entity_text_trimmed,
                             "label": label,
                             "source": "NER",
                             "score": float(entity.get("score", 0.0)),
@@ -563,7 +605,10 @@ class ChunkedNER:
 class ConflictResolver:
     """Résolveur de conflits entre NER, règles et gazetteers avec système de priorité"""
     
-    def __init__(self):
+    def __init__(self, exclusions: List[str] = None):
+        # Liste d'exclusions (termes à ne jamais pseudonymiser)
+        self.exclusions = set(exclusions) if exclusions else set()
+        
         # Priorités : plus haut = prioritaire (matrice améliorée)
         self.priorities = {
             # Données sensibles critiques
@@ -572,6 +617,9 @@ class ConflictResolver:
             "RULES_NIR": 9.4,
             "ENHANCED_ADDR_FULL": 9.3,
             "RULES_ADDR_FULL": 9.2,
+            
+            # Fusion TYPE+LOC - priorité TRÈS élevée (TYPE explicite prime sur gazetteer)
+            "MERGED_TYPE_LOC_ETAB": 9.1,
             
             # Gazetteers - priorité absolue pour entités connues
             "GAZETTEER_ORG": 9.0,
@@ -662,7 +710,10 @@ class ConflictResolver:
         label = entity["label"]
         category = entity.get("category")
         
-        if source == "GAZETTEER":
+        # Fusion TYPE+LOC a une clé spéciale pour priorité très haute
+        if source == "MERGED_TYPE_LOC":
+            return "MERGED_TYPE_LOC_ETAB"
+        elif source == "GAZETTEER":
             return f"GAZETTEER_{label}"
         elif source == "RULES":
             # Utiliser la catégorie spécifique si disponible
@@ -682,9 +733,20 @@ class ConflictResolver:
         """Filtre les entités invalides"""
         text = entity["text"].strip()
         
-        # Éliminer les chaînes vides ou trop courtes
+        # 🚫 EXCLUSIONS : vérifier si le texte est dans la liste d'exclusion
+        if text in self.exclusions or text.lower() in self.exclusions:
+            logging.debug(f"🚫 Entité exclue (stoplist): '{text}'")
+            return False
+        
+        # Éliminer les chaînes vides ou trop courtes (sauf codes postaux, téléphones)
         if len(text) < 2:
             logging.debug(f"🗑️ Entité trop courte ignorée: '{text}'")
+            return False
+        
+        # Filtrer les fragments d'adresse isolés
+        address_fragments = ["du", "de la", "de l", "des", "Les", "Pôle", "Industrie", "rue de l"]
+        if text in address_fragments:
+            logging.debug(f"🗑️ Fragment d'adresse ignoré: '{text}'")
             return False
             
         # Éliminer les entités qui sont juste des lettres isolées pour ORG
@@ -775,9 +837,18 @@ class ConflictResolver:
                     logging.debug(f"🏥 CHU detected: '{text}' → ORG_CHU_CH")
                     return entity
             
-            # Vérifier si c'est une adresse
+            # Types d'établissements qui nécessitent une fusion (à vérifier AVANT reclassification)
+            fusion_types = ['EHPAD', 'MAS', 'FAM', 'MECS', 'IME', 'ITEP', 'SESSAD',
+                           'ESAT', 'CMPP', 'CAMSP', 'FJT', 'CHRS', 'IMPRO', 'IEM', 
+                           'IES', 'SAFEP', 'SSEFS', 'EEAP']
+            
+            # Vérifier si un TYPE d'établissement est immédiatement AVANT (gap ≤ 3 caractères)
+            prefix_context = full_text[max(0, start - 15):start].strip().upper()
+            has_adjacent_type = any(ftype in prefix_context for ftype in fusion_types)
+            
+            # Vérifier si c'est une adresse (SAUF si type établissement adjacent)
             is_address = any(re.search(pattern, text.lower()) for pattern in address_patterns)
-            if is_address:
+            if is_address and not has_adjacent_type:
                 if re.search(r"\b\d{5}\b", text):
                     entity["label"] = "ADDR_FULL"
                     entity["category"] = "ADDR_FULL"
@@ -788,43 +859,39 @@ class ConflictResolver:
                 logging.debug(f"🏠 Address detected: '{text}' → {entity['label']}")
                 return entity
             
-            # Vérifier si c'est une ville (seulement si pas CHU)
+            # Vérifier si c'est une ville (SAUF si type établissement adjacent)
             is_city = any(re.search(pattern, text.lower()) for pattern in city_patterns)
-            if is_city:
+            if is_city and not has_adjacent_type:
                 entity["label"] = "LOC_CITY"
                 entity["category"] = "LOC_CITY"
                 entity["source"] = "ENHANCED"
                 logging.debug(f"🌍 City detected: '{text}' → LOC_CITY")
                 return entity
+            
+            # Si type établissement adjacent, préserver LOC pour fusion
+            if has_adjacent_type:
+                logging.debug(f"🔗 LOC '{text}' préservé pour fusion avec TYPE adjacent (évite reclassification ville/adresse)")
         
         # Expansion d'établissement UNIQUEMENT si l'ancre est présente dans le contexte proche
+        # ET que le TYPE d'établissement n'est PAS déjà adjacent (fusion gérée séparément)
         if entity["label"] == "LOC" and entity["source"] == "NER":
-            for etab_type, keywords in etab_patterns.items():
-                # Vérifier si un mot-clé d'établissement est dans le contexte ET proche (±30 caractères)
-                close_context = full_text[max(0, start - 30):min(len(full_text), end + 30)].lower()
-                if any(keyword in close_context for keyword in keywords):
-                    # Heuristiques d'établissement améliorées
-                    if _is_establishment_name(text, close_context):
-                        logging.debug(f"🏢 LOC→ETAB: '{text}' reclassé comme {etab_type}")
-                        entity["label"] = etab_type
-                        entity["category"] = etab_type
-                        entity["source"] = "ENHANCED"
-                        break
+            # has_adjacent_type déjà calculé ci-dessus
             
-            # Heuristique ETAB_GENERIC pour noms poétiques sans gazetteer
-            if entity["label"] == "LOC":  # Si pas encore reclassé
-                # Chercher des verbes d'établissement dans le contexte ±50
-                establishment_context_verbs = [
-                    "accueille", "héberge", "admet", "suit", "accompagne", 
-                    "oriente", "inscrit", "logé", "placé", "admis", "suivi", "hébergé"
-                ]
-                extended_context = full_text[max(0, start - 50):min(len(full_text), end + 50)].lower()
-                if any(verb in extended_context for verb in establishment_context_verbs):
-                    if _is_establishment_name(text, extended_context):
-                        logging.debug(f"🏢 LOC→ETAB_GENERIC: '{text}' reclassé comme établissement générique")
-                        entity["label"] = "ETAB_GENERIC"
-                        entity["category"] = "ETAB_GENERIC"
-                        entity["source"] = "ENHANCED"
+            if not has_adjacent_type:
+                for etab_type, keywords in etab_patterns.items():
+                    # Vérifier si un mot-clé d'établissement est dans le contexte ET proche (±30 caractères)
+                    close_context = full_text[max(0, start - 30):min(len(full_text), end + 30)].lower()
+                    if any(keyword in close_context for keyword in keywords):
+                        # Heuristiques d'établissement améliorées
+                        if _is_establishment_name(text, close_context):
+                            logging.debug(f"🏢 LOC→ETAB: '{text}' reclassé comme {etab_type}")
+                            entity["label"] = etab_type
+                            entity["category"] = etab_type
+                            entity["source"] = "ENHANCED"
+                            break
+            
+            # Note: Heuristique ETAB_GENERIC supprimée - chaque type d'établissement
+            # doit avoir son pattern spécifique dans rules.yaml
 
         # Reclassifier les personnes mal étiquetées comme ORG
         if entity["label"] == "ORG" and entity["source"] == "NER":
@@ -842,22 +909,9 @@ class ConflictResolver:
                     entity["label"] = "PER"
                     entity["source"] = "ENHANCED"
                     break
-            else:
-                # Si c'est une vraie entreprise, créer catégorie spécialisée
-                if any(word in text.lower() for word in ["carrefour", "auchan", "leclerc", "casino"]):
-                    entity["category"] = "ORG_ENTREPRISE_PRIV"
-                    entity["source"] = "ENHANCED"
-        
-        # Disambiguation PER vs ETAB pour noms propres comme "Jean Piaget"
-        if entity["label"] == "PER" and entity["source"] == "NER":
-            # Chercher des indicateurs d'établissement dans la même phrase
-            sentence_context = full_text[max(0, start - 100):min(len(full_text), end + 100)].lower()
-            etab_indicators = ["ime", "école", "collège", "lycée", "établissement", "institution", "centre"]
-            if any(indicator in sentence_context for indicator in etab_indicators):
-                logging.debug(f"🏢 PER→ETAB_GENERIC: '{text}' reclassé comme établissement (contexte)")
-                entity["label"] = "ETAB_GENERIC"
-                entity["category"] = "ETAB_GENERIC"
-                entity["source"] = "ENHANCED"
+
+        # Note: Disambiguation PER vs ETAB supprimée - les noms de personnes
+        # détectés par NER restent comme PER (plus de reclassification en ETAB_GENERIC)
         
         # Extension CHU : si une entité contient "CHU" et un nom de ville, étendre pour capturer le nom complet
         if entity["label"] in ["ORG", "LOC"] and entity["source"] == "NER":
@@ -994,9 +1048,6 @@ class ConflictResolver:
         
         if corrections_applied > 0:
             logging.info(f"🎯 Désambiguïsation contextuelle: {corrections_applied} corrections appliquées")
-        else:
-            etab_generic_count = len([e for e in entities if e.get('label', '').startswith('ETAB_GENERIC') and (e.get('source', '').startswith('NER') or e.get('source', '') == 'ENHANCED')])
-            logging.warning(f"⚠️ Désambiguïsation contextuelle: 0 correction appliquée sur {etab_generic_count} entités ETAB_GENERIC candidates")
         
         return corrected_entities
     
@@ -1068,6 +1119,122 @@ class ConflictResolver:
         
         return False
     
+    def _merge_type_location(self, entities: List[Dict], full_text: str) -> List[Dict]:
+        """
+        Fusionne les TYPES d'établissements (EHPAD, MAS, IME, etc.) avec les LOC/PER adjacents
+        détectés par le NER pour créer des entités ETAB complètes.
+        
+        Logique:
+        - Rules détecte "EHPAD" seul
+        - NER détecte "Sainte-Gertrude" en LOC
+        - Si adjacents (≤ 2 chars d'écart) → fusionner en ETAB_EHPAD "EHPAD Sainte-Gertrude"
+        - Si séparés → ignorer le TYPE seul (filtré par exclusions)
+        """
+        logging.info(f"🔍 _merge_type_location appelée avec {len(entities)} entités")
+        
+        # Log des entités entrantes pour debug
+        for i, e in enumerate(entities[:10]):  # Limiter à 10 pour éviter spam
+            logging.debug(f"  [{i}] {e.get('source', 'UNK'):15s} {e.get('label', 'UNK'):8s} {e.get('category', 'N/A'):20s} '{e.get('text', 'N/A')}' (start={e.get('start', 'N/A')}, end={e.get('end', 'N/A')})")
+        
+        # Types d'établissements à fusionner avec noms propres
+        ETAB_TYPES = {
+            'EHPAD', 'MAS', 'FAM', 'MECS', 'IME', 'ITEP', 'SESSAD',
+            'ESAT', 'CMPP', 'CAMSP', 'FJT', 'CHRS', 'IMPRO', 'IEM', 
+            'IES', 'SAFEP', 'SSEFS', 'EEAP'
+        }
+        
+        # Services NON pseudonymisables (restent tels quels)
+        SERVICE_TYPES = {
+            'SERVICE_SAVS', 'SERVICE_SAMSAH', 'SERVICE_SSIAD', 
+            'SERVICE_SPASAD', 'SERVICE_SAAD', 'SERVICE_CMP',
+            'SERVICE_CATTP', 'SERVICE_CSAPA', 'SERVICE_CAARUD', 'SERVICE_PASS'
+        }
+        
+        merged = []
+        skip_indices = set()
+        
+        # Trier par position pour traitement séquentiel
+        sorted_entities = sorted(enumerate(entities), key=lambda x: x[1]['start'])
+        
+        for i, (idx, entity) in enumerate(sorted_entities):
+            if idx in skip_indices:
+                continue
+            
+            # Vérifier si c'est un TYPE d'établissement détecté par RULES
+            is_etab_type = (
+                entity['source'] == 'RULES' and 
+                entity.get('category') in ETAB_TYPES
+            )
+            
+            if is_etab_type and i + 1 < len(sorted_entities):
+                # Récupérer l'entité suivante
+                next_idx, next_entity = sorted_entities[i + 1]
+                
+                # Calculer l'écart entre les deux entités
+                gap = next_entity['start'] - entity['end']
+                
+                # Vérifier si l'entité suivante est un LOC ou PER du NER et est adjacente
+                is_adjacent_name = (
+                    next_entity['label'] in {'LOC', 'PER'} and
+                    next_entity['source'] == 'NER' and
+                    gap <= 3  # Max 3 chars d'écart (pour "l'", " ", etc.)
+                )
+                
+                # Log pour debug
+                if entity.get('category') == 'SESSAD':
+                    logging.info(f"🔍 SESSAD: '{entity['text']}' end={entity['end']}, next='{next_entity.get('text', 'N/A')}' start={next_entity.get('start', 'N/A')}, gap={gap}, is_adjacent={is_adjacent_name}")
+                
+                if is_adjacent_name:
+                    # FUSION !
+                    type_category = entity.get('category')
+                    type_text = entity['text']
+                    name_text = next_entity['text']
+                    
+                    # Construire le texte complet de l'entité fusionnée
+                    merged_start = entity['start']
+                    merged_end = next_entity['end']
+                    merged_text = full_text[merged_start:merged_end]
+                    
+                    # Log de fusion pour debug
+                    logging.info(f"🔗 Fusion: '{type_text}' (start={merged_start}, end={entity['end']}) + '{name_text}' (start={next_entity['start']}, end={merged_end}) → '{merged_text}'")
+                    
+                    # Catégorie finale : ETAB_<TYPE> (ne pas doubler si déjà ETAB_)
+                    final_category = type_category if type_category.startswith('ETAB_') else f"ETAB_{type_category}"
+                    
+                    merged_entity = {
+                        'text': merged_text,
+                        'start': merged_start,
+                        'end': merged_end,
+                        'label': 'ETAB',
+                        'category': final_category,
+                        'source': 'MERGED_TYPE_LOC',
+                        'score': max(entity.get('score', 1.0), next_entity.get('score', 0.8))
+                    }
+                    
+                    merged.append(merged_entity)
+                    skip_indices.add(next_idx)  # Ignorer l'entité suivante (déjà fusionnée)
+                    
+                    logging.debug(f"🔗 Fusion TYPE+LOC: '{type_text}' + '{name_text}' → '{merged_text}' ({final_category})")
+                    continue
+                    
+            # Pas de fusion possible : garder l'entité originale SAUF si c'est un TYPE seul
+            if entity['source'] == 'RULES' and entity.get('category') in ETAB_TYPES:
+                # TYPE seul sans nom adjacent → ne pas pseudonymiser (filtrage implicite)
+                logging.debug(f"🚫 TYPE seul ignoré (pas de nom adjacent): '{entity['text']}' ({entity.get('category')})")
+                continue
+            
+            # Services génériques : conserver mais NE PAS pseudonymiser
+            if entity.get('category') in SERVICE_TYPES:
+                logging.debug(f"ℹ️ Service générique détecté (non pseudonymisé): '{entity['text']}' ({entity.get('category')})")
+                # On ne l'ajoute PAS à merged pour éviter la pseudonymisation
+                continue
+            
+            # Entité valide : ajouter
+            merged.append(entity)
+        
+        logging.info(f"🔗 Fusion TYPE+LOC: {len(entities)} → {len(merged)} entités ({len(entities) - len(merged)} filtrées)")
+        return merged
+    
     def resolve_conflicts(self, ner_entities: List[Dict], rules_entities: List[Dict], gazetteer_entities: List[Dict] = None, full_text: str = "") -> List[Dict]:
         """Résout les conflits entre NER, règles et gazetteers avec filtrage avancé et désambiguïsation"""
         all_entities = ner_entities + rules_entities
@@ -1089,6 +1256,10 @@ class ConflictResolver:
         # Étape 3 : Désambiguïsation contextuelle (APRÈS l'amélioration pour corriger les erreurs)
         if full_text:
             valid_entities = self._contextual_disambiguation(full_text, valid_entities)
+        
+        # Étape 4 : Fusion TYPE + LOC/PER pour établissements (NOUVELLE LOGIQUE)
+        if full_text:
+            valid_entities = self._merge_type_location(valid_entities, full_text)
         
         resolved = []
         
@@ -1132,7 +1303,9 @@ class ConflictResolver:
             stats[key] = stats.get(key, 0) + 1
         
         logging.info(f"⚖️ Conflits résolus: {len(resolved)} entités finales {stats}")
+        
         return resolved
+    
 
 
 def pseudonymize_text(text: str, entities: List[Dict], store: PseudonymStore) -> str:
@@ -1230,8 +1403,14 @@ def main():
         gazetteers = GazetteerEngine(args.gazetteers)
         gazetteer_entities = gazetteers.detect_entities(text)
         
+        # Charger les exclusions depuis le gazetteer_exclusions
+        exclusions = []
+        if 'gazetteer_exclusions' in gazetteers.gazetteers:
+            exclusions = [entry['name'] for entry in gazetteers.gazetteers['gazetteer_exclusions']]
+            logging.info(f"🚫 {len(exclusions)} exclusions chargées")
+        
         # Résolution des conflits
-        resolver = ConflictResolver()
+        resolver = ConflictResolver(exclusions=exclusions)
         final_entities = resolver.resolve_conflicts(ner_entities, rules_entities, gazetteer_entities, text)
         
         # Pseudonymisation

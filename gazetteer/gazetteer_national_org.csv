@@ -1,7 +1,11 @@
 name,category
 Pôle emploi,ORG_PUBLIC_NAT
 URSSAF,ORG_PUBLIC_NAT
-Caisse Nationale d’Allocations Familiales,ORG_PUBLIC_NAT
+Caisse Nationale d'Allocations Familiales,ORG_PUBLIC_NAT
 Croix-Rouge française,ORG_ASSOC_NAT
 CNAM,ORG_PUBLIC_NAT
 CNAF,ORG_PUBLIC_NAT
+Région Auvergne-Rhône-Alpes,ORG_PUBLIC_TERR
+Conseil Départemental,ORG_PUBLIC_TERR
+UDAF,ORG_ASSOC_NAT
+Union Départementale des Associations Familiales,ORG_ASSOC_NAT
